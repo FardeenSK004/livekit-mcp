@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     jwt_issuer: str | None = Field(default=None, validation_alias="JWT_ISSUER")
     jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")
 
+    # MantraAssist PostgreSQL Database (assist_db)
+    database_url: str = Field(
+        default="postgresql://user:admin@77413@localhost:5433/assist_db",
+        validation_alias="DATABASE_URL",
+    )
+    assist_db_url: str | None = Field(
+        default=None,
+        validation_alias="ASSIST_DB_URL",
+    )
+
     # LKT Voice Agent & Telephony Service
     lkt_api_base_url: str = Field(
         default="http://localhost:8081",
@@ -46,6 +56,11 @@ class Settings(BaseSettings):
     livekit_url: str | None = Field(default=None, validation_alias="LIVEKIT_URL")
     livekit_api_key: str | None = Field(default=None, validation_alias="LIVEKIT_API_KEY")
     livekit_api_secret: str | None = Field(default=None, validation_alias="LIVEKIT_API_SECRET")
+
+    @property
+    def effective_db_url(self) -> str:
+        """Return the effective database URL (ASSIST_DB_URL or DATABASE_URL)."""
+        return self.assist_db_url or self.database_url
 
     @property
     def is_production(self) -> bool:

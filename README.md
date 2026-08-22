@@ -6,17 +6,16 @@
 [![uv](https://img.shields.io/badge/package%20manager-uv-purple.svg)](https://github.com/astral-sh/uv)
 [![MCP](https://img.shields.io/badge/protocol-MCP%202.0-orange.svg)](https://modelcontextprotocol.io/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Tests](https://img.shields.io/badge/tests-18%20passed-brightgreen.svg)]()
 
-**A high-performance Model Context Protocol (MCP 2.0) Server bridging AI Agents with the MantraCare LiveKit Voice & Telephony Engine.**
+**A high-performance Model Context Protocol (MCP 2.0) Server bridging AI Agents and Backend Services with the MantraCare LiveKit Voice & Telephony Engine.**
 
 [Architecture](#-system-architecture) •
 [Quick Start](#-quick-start) •
 [Configuration](#-configuration) •
-[Connecting Clients](#-connecting-mcp-clients) •
-[Authentication](#-authentication) •
 [Tools](#-available-tools) •
-[Development](#-development--testing)
+[Authentication](#-authentication) •
+[Connecting Clients](#-connecting-mcp-clients) •
+[Development](#-development)
 
 </div>
 
@@ -24,49 +23,56 @@
 
 ## 📖 Overview
 
-The **LiveKit MCP Server** allows LLMs and AI coding assistants (such as Antigravity, Claude, Cursor, and custom agents) to securely control, inspect, and trigger voice telephony pipelines powered by **LiveKit** (`~/lkt`) and authenticated via **Mantra Auth** (`~/mantra-auth`).
+The **LiveKit MCP Server** acts as the central intelligence and scheduling hub. It connects backend databases (`MantraAssist-backend`), telephony voice agents (`~/lkt`), and OAuth security (`~/mantra-auth`), providing AI agents with real-time tools for doctor availability, appointment scheduling, and caller timezone resolution.
 
 ### Key Capabilities
-- 🚀 **MCP 2.0 Compliance**: Built on the official Python `mcp` SDK using Server-Sent Events (SSE) and Streamable HTTP transports.
-- 🔐 **OAuth 2.1 & Shared JWT Security**: Native HS256 JWT validation matching `mantra-auth`, with support for both `Authorization: Bearer` headers and `?token=` query parameters.
-- ⚡ **Lightning Fast Async Core**: Powered by Starlette, Uvicorn, and `uv` package management.
-- 🧩 **Modular Tool Architecture**: Domain-separated tools for telephony, call analytics, knowledge base search, and SIP trunking.
-- 🧠 **Agentic Memory**: Full Obsidian knowledge base (`obsidian/`) and `AGENTS.md` rules for AI pair programming context preservation.
+
+- 🚀 **MCP 2.0 Compliance**: Built on the official Python `mcp` SDK using Server-Sent Events (SSE) and Streamable HTTP transports (`/sse`, `/messages`, `/api/tools/call`).
+- 🌍 **International Timezone Auto-Detection**: Automatically detects caller country and IANA timezone from international phone numbers (`+1` US ➔ EDT/CDT, `+44` UK ➔ GMT/BST, `+91` India ➔ IST, `+971` UAE ➔ GST) using Google's `phonenumbers` engine, converting UTC database slots to local time on the fly.
+- 👨‍⚕️ **Multi-Provider Schedules**: Handles arrays of doctors/providers and their respective available working hours in a single request.
+- 🔐 **OAuth 2.1 & Shared JWT Security**: Native HS256 JWT validation compatible with `mantra-auth`, supporting both `Authorization: Bearer <token>` headers and `?token=<token>` query parameters.
+- ⚡ **Lightning Fast Async Core**: Powered by Starlette, `asyncpg` connection pooling, and Uvicorn.
+- 🧠 **Agentic Memory**: Permanent Obsidian knowledge vault (`obsidian/`) and `AGENTS.md` rules.
 
 ---
 
 ## 🏛️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ AI Client (Cursor / Claude / Antigravity / Web Agent)       │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ 1. Bearer Token / ?token= (OAuth 2.1)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ [3. mantra-auth (:3000)]                                    │
-│ Next.js + Prisma OAuth 2.1 Authorization Server             │
-│ - Issues HS256 JWTs and verifies via /api/oauth/introspect  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Shared JWT Secret Verification
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ [2. livekit-mcp (:8000)] (This Server)                      │
-│ - Starlette ASGI + MCP 2.0 SSE Transport                    │
-│ - Pure ASGI Auth Middleware (HS256 JWT validation)          │
-│ - Public Endpoints: /health, /                              │
-│ - Protected Endpoints: /sse, /messages                      │
-│ - Registered Tools: greet_user, [Telephony/KB/SIP coming]   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ 2. Async HTTP (REST)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ [1. lkt (:8081)]                                            │
-│ MantraCare LiveKit Voice Agent & Telephony Engine           │
-│ - SIP Trunks (Plivo, Zadarma, VoiceLink, Twilio)            │
-│ - LiveKit Cloud WebRTC Rooms & STT→LLM→TTS Voice Pipeline   │
-│ - PostgreSQL (call_logs, kb_pages) & Redis (queues, locks)  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. mantra-auth (:3000)                                                      │
+│    Next.js OAuth 2.1 Authorization Server                                   │
+│    • DB: postgres_auth (:5441 / mantra_auth_dev)                            │
+│    • Issues HS256 JWT Tokens for Clients & Services                         │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Issues JWT Bearer Token
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. MantraAssist-backend (:5500) [MCP CLIENT]                                │
+│    Express.js / TypeScript Core Backend                                     │
+│    • Computes doctor working hours from assist_db                           │
+│    • Calls MCP tool over SSE / HTTP (/sse?token=...)                        │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Invokes `receive_doctor_availability`
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. livekit-mcp (:8000) [THIS MCP SERVER]                                    │
+│    Starlette + MCP 2.0 SSE Transport                                        │
+│    • Auth Middleware: Validates HS256 JWT                                   │
+│    • Timezone Resolver: Detects caller timezone from phone number           │
+│    • Formatter: Normalizes UTC slots ➔ Caller's localized 12-hour format    │
+│    • Public Endpoints: /health, /                                           │
+│    • Protected Endpoints: /sse, /messages, /api/tools/call                  │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Real-time Tool Result
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. lkt (:8081) [VOICE TELEPHONY AGENT]                                      │
+│    MantraCare LiveKit Voice Telephony Engine                                │
+│    • STT ➔ LLM ➔ TTS Voice Pipeline                                         │
+│    • Calls check_doctor_availability dynamically mid-call                   │
+│    • Speaks localized doctor times naturally to the caller                  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -90,33 +96,34 @@ livekit-mcp/
 │   ├── Context/                # Stack, project summary & repository map
 │   ├── Development/            # Sprint tracking, TODO & Changelog
 │   ├── Features/               # Feature specifications (tools, auth)
-│   └── Knowledge/              # Coding standards & architectural conventions
+│   └── Knowledge/              # Coding standards & conventions
 │
-├── src/
-│   └── livekit_mcp/
-│       ├── __init__.py
-│       ├── config.py           # Pydantic Settings & environment validation
-│       ├── server.py           # MCPServer & Starlette app factory
-│       ├── main.py             # CLI runner with Uvicorn
-│       ├── auth/
-│       │   ├── __init__.py
-│       │   ├── jwt.py          # HS256 JWT decoding & claims validation
-│       │   └── middleware.py   # Pure ASGI auth middleware (headers & ?token=)
-│       ├── clients/
-│       │   ├── __init__.py
-│       │   ├── lkt_client.py   # Async HTTP client for lkt FastAPI (:8081)
-│       │   └── auth_client.py  # Async HTTP client for mantra-auth (:3000)
-│       └── tools/
-│           ├── __init__.py
-│           └── greeting.py     # Initial `greet_user` verification tool
+├── scripts/
+│   └── generate_token.py       # CLI utility to generate signed JWT tokens
 │
-└── tests/
-    ├── __init__.py
-    ├── conftest.py             # Fixtures for tokens, settings & test client
-    ├── test_config.py          # Configuration unit tests
-    ├── test_auth.py            # JWT verification & claims unit tests
-    ├── test_greeting.py        # Tool registration & execution tests
-    └── test_server.py          # Endpoints, SSE & Auth integration tests
+└── src/
+    └── livekit_mcp/
+        ├── __init__.py
+        ├── config.py           # Pydantic Settings & environment validation
+        ├── server.py           # MCPServer & Starlette app factory
+        ├── main.py             # CLI runner with Uvicorn
+        ├── auth/
+        │   ├── __init__.py
+        │   ├── jwt.py          # HS256 JWT decoding & claims validation
+        │   └── middleware.py   # Pure ASGI auth middleware (headers & ?token=)
+        ├── clients/
+        │   ├── __init__.py
+        │   ├── db_client.py    # Async PostgreSQL pool (asyncpg)
+        │   ├── lkt_client.py   # Async HTTP client for lkt (:8081)
+        │   └── auth_client.py  # Async HTTP client for mantra-auth (:3000)
+        ├── utils/
+        │   ├── __init__.py
+        │   └── timezone.py     # Phone number timezone auto-detection & UTC converter
+        └── tools/
+            ├── __init__.py
+            ├── greeting.py     # `greet_user` health test tool
+            ├── providers.py    # `search_provider_availability` direct DB search
+            └── doctor_availability.py # `receive_doctor_availability` receiver tool
 ```
 
 ---
@@ -124,254 +131,168 @@ livekit-mcp/
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
+
 - **Python**: 3.11 or higher
 - **uv**: Fast Python package manager ([Install uv](https://docs.astral.sh/uv/getting-started/installation/))
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 
-### 2. Installation & Setup
+### 2. Installation & Configuration
 
-1. **Clone the repository and enter the directory**:
-   ```bash
-   cd ~/livekit-mcp
-   ```
+```bash
+cd ~/livekit-mcp
+cp .env.example .env
+uv sync
+```
 
-2. **Create your environment configuration**:
-   ```bash
-   cp .env.example .env
-   ```
+### 3. Generate a JWT Access Token
 
-3. **Install dependencies with `uv`**:
-   ```bash
-   uv sync
-   ```
+To generate a signed 72-hour access token for testing or client configuration:
 
-### 3. Running the Server
+```bash
+uv run python scripts/generate_token.py --hours 72
+```
 
-Start the development server with auto-reload:
+### 4. Start the Server
+
 ```bash
 ./dev.sh
 ```
 
-Or run directly using `uv`:
-```bash
-uv run python -m livekit_mcp.main
-```
-
-The server will be available at **`http://localhost:8000`**.
+Server runs at `http://localhost:8000`.
 
 ---
 
-## ⚙️ Configuration
+## 🛠 Available Tools
 
-All settings are managed in `src/livekit_mcp/config.py` using `pydantic-settings` and loaded from `.env`:
+### 1. `receive_doctor_availability`
+Receives calculated doctor availability and open time slots in **UTC** for multiple providers. Automatically detects the caller's timezone from their international phone number and returns formatted local times for the voice agent.
 
-| Variable | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `HOST` | string | `0.0.0.0` | Server bind address |
-| `PORT` | integer | `8000` | Server listening port |
-| `ENVIRONMENT` | string | `development` | `development`, `test`, or `production` |
-| `LOG_LEVEL` | string | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `AUTH_ENABLED` | boolean | `true` | Enforce JWT authentication on protected endpoints |
-| `JWT_SECRET` | string | `your-super-secret-...` | Shared secret key for HS256 JWT signature verification |
-| `JWT_ALGORITHM` | string | `HS256` | JWT signing algorithm (matches `mantra-auth`) |
-| `AUTH_SERVER_URL` | string | `http://localhost:3000` | Base URL of the Mantra Auth server |
-| `JWT_ISSUER` | string | `http://localhost:3000` | Expected JWT issuer claim (`iss`) |
-| `JWT_AUDIENCE` | string | *(empty)* | Optional expected audience claim (`aud`) |
-| `LKT_API_BASE_URL` | string | `http://localhost:8081` | Base URL of the LKT Voice Agent API |
-| `LKT_API_TIMEOUT` | float | `15.0` | HTTP request timeout in seconds for LKT calls |
-| `LIVEKIT_URL` | string | *(empty)* | Direct LiveKit Cloud WebSocket URL (optional) |
-| `LIVEKIT_API_KEY` | string | *(empty)* | Direct LiveKit Cloud API Key (optional) |
-| `LIVEKIT_API_SECRET` | string | *(empty)* | Direct LiveKit Cloud API Secret (optional) |
+* **Arguments**:
+  - `org_id` *(int)*: Organization ID.
+  - `date` *(string)*: Target date (`YYYY-MM-DD`).
+  - `caller_phone` *(string, optional)*: International phone number (`+12025550123`, `+918360625862`).
+  - `providers` *(array of objects)*:
+    - `user_id` *(int)*: Doctor ID (`users.id`).
+    - `name` *(string)*: Doctor's name.
+    - `available_slots` *(array of strings)*: UTC time ranges (`["14:00 - 15:00", "16:00 - 17:00"]`).
 
----
-
-## 📡 Endpoints
-
-| Endpoint | Method | Auth Required | Description |
-| :--- | :--- | :--- | :--- |
-| **`/health`** | `GET` | ❌ No | Public health & readiness check returning service status |
-| **`/`** | `GET` | ❌ No | Service status and endpoint metadata |
-| **`/sse`** | `GET` | ✅ Yes | Opens a persistent Server-Sent Events (SSE) stream for MCP clients |
-| **`/messages`** | `POST` | ✅ Yes | JSON-RPC 2.0 endpoint for MCP requests (tool execution, listings) |
-
-### Health Check Sample
-```bash
-curl http://localhost:8000/health
-```
+* **Example Payload**:
 ```json
 {
-  "status": "healthy",
-  "service": "livekit-mcp",
-  "version": "0.1.0",
-  "auth_enabled": true,
-  "environment": "development",
-  "lkt_api_configured": true,
-  "timestamp": "2026-08-20T12:30:00.000000+00:00"
+  "org_id": 66,
+  "date": "2026-08-25",
+  "caller_phone": "+12025550123",
+  "providers": [
+    {
+      "user_id": 12,
+      "name": "Dr. Ananya Sharma",
+      "available_slots": [
+        "14:00 - 15:00",
+        "16:00 - 17:00"
+      ]
+    },
+    {
+      "user_id": 15,
+      "name": "Dr. Rajesh Kumar",
+      "available_slots": [
+        "15:00 - 16:00",
+        "17:00 - 18:00"
+      ]
+    }
+  ]
 }
 ```
+
+* **Voice Agent Output**:
+```text
+📅 Available Doctors on Tuesday, Aug 25, 2026 (Local Timezone: America/New_York):
+
+1. Dr. Ananya Sharma (User ID: 12)
+   • Available Slots: 10:00 AM – 11:00 AM EDT, 12:00 PM – 1:00 PM EDT
+
+2. Dr. Rajesh Kumar (User ID: 15)
+   • Available Slots: 11:00 AM – 12:00 PM EDT, 1:00 PM – 2:00 PM EDT
+
+Org ID: 66 | Caller Phone: +12025550123
+```
+
+---
+
+### 2. `search_provider_availability`
+Queries `assist_db` directly (`asyncpg`), evaluates RFC 5545 recurrence rules, and converts working hours to the organization's or caller's local timezone.
+
+* **Arguments**:
+  - `org_id` *(int)*: Organization ID.
+  - `query_date` *(string)*: Date to search (`YYYY-MM-DD`).
+  - `query` *(string, optional)*: Doctor name or specialty filter.
+  - `caller_phone` *(string, optional)*: Caller phone number for timezone localization.
+
+---
+
+### 3. `greet_user`
+Simple latency and connectivity verification tool.
+
+---
+
+## 🌐 API Endpoints
+
+| Endpoint | Method | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| **`/health`** | `GET` | Public | Returns service status, version, and auth configuration |
+| **`/`** | `GET` | Public | Root welcome & discovery info |
+| **`/sse`** | `GET` | Bearer / `?token=` | MCP Server-Sent Events connection stream |
+| **`/messages`** | `POST` | Bearer / `?token=` | MCP JSON-RPC message transport |
+| **`/api/tools/call`** | `POST` | Bearer / `?token=` | Direct tool execution endpoint for microservices |
 
 ---
 
 ## 🔐 Authentication
 
-The server implements **OAuth 2.1 / HS256 Shared JWT Authentication** compatible with `mantra-auth`.
+All protected endpoints (`/sse`, `/messages`, `/api/tools/call`) require a valid JWT token signed with `JWT_SECRET`.
 
-### Supplying Credentials
-
-1. **Authorization Header (Standard)**:
+### Passing the Token:
+1. **Via Authorization Header**:
    ```http
-   GET /sse HTTP/1.1
-   Host: localhost:8000
-   Authorization: Bearer <your-jwt-access-token>
+   Authorization: Bearer <YOUR_JWT_TOKEN>
    ```
-
-2. **Query Parameter (For SSE / EventSource clients)**:
+2. **Via Query Parameter** *(Recommended for EventSource browser/SSE clients)*:
    ```http
-   GET /sse?token=<your-jwt-access-token> HTTP/1.1
-   Host: localhost:8000
+   GET http://localhost:8000/sse?token=<YOUR_JWT_TOKEN>
    ```
-
-### Expected JWT Claims
-```json
-{
-  "sub": "user-123",
-  "aud": "client-app",
-  "iss": "http://localhost:3000",
-  "exp": 1755694800,
-  "iat": 1755691200,
-  "scope": "openid profile telephony:call",
-  "token_type": "access_token"
-}
-```
-
-> **Development Tip**: Set `AUTH_ENABLED=false` in `.env` to disable token verification during local testing.
 
 ---
 
-## 🛠️ Available Tools
+## 🛠 Connecting MCP Clients
 
-### 1. `greet_user`
-A verification tool that validates MCP connectivity, parameter parsing, and server status.
+### From Node.js / TypeScript (`MantraAssist-backend`):
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
-* **Parameters**:
-  * `name` (string, required): Name of the user or agent invoking the tool.
-  * `message` (string, optional): Custom greeting message.
-* **Returns**:
-  ```text
-  👋 Hello, Alice!
+const transport = new SSEClientTransport(
+  new URL(`http://localhost:8000/sse?token=${process.env.MCP_JWT_TOKEN}`)
+);
+const client = new Client({ name: "mantra-backend", version: "1.0.0" }, { capabilities: {} });
+await client.connect(transport);
 
-  Welcome to MantraCare LiveKit MCP!
+const result = await client.callTool({
+  name: "receive_doctor_availability",
+  arguments: { ... }
+});
+```
 
-  --- System Status ---
-  • Service: LiveKit MCP Server
-  • Status: Operational & Ready
-  • Timestamp: 2026-08-20T12:30:00.000000+00:00
-  • Protocol: MCP 2.0 (SSE / HTTP)
+---
+
+## 💻 Development
+
+- **Lint & Format**:
+  ```bash
+  uv run ruff check --fix .
+  uv run ruff format .
   ```
-
----
-
-## 🔌 Connecting MCP Clients
-
-### 1. Antigravity / Gemini CLI (`~/.gemini/config/mcp_config.json`)
-```json
-{
-  "mcpServers": {
-    "livekit": {
-      "serverUrl": "http://localhost:8000/sse"
-    }
-  }
-}
-```
-
-### 2. Cursor IDE (`.cursor/mcp.json`)
-```json
-{
-  "mcpServers": {
-    "livekit": {
-      "url": "http://localhost:8000/sse",
-      "headers": {
-        "Authorization": "Bearer <YOUR_JWT_TOKEN>"
-      }
-    }
-  }
-}
-```
-
-### 3. Claude Desktop (`claude_desktop_config.json`)
-```json
-{
-  "mcpServers": {
-    "livekit": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/home/fardeen/livekit-mcp",
-        "run",
-        "python",
-        "-m",
-        "livekit_mcp.main"
-      ],
-      "env": {
-        "AUTH_ENABLED": "false"
-      }
-    }
-  }
-}
-```
-
----
-
-## 🧪 Development & Testing
-
-### Running Tests
-The project includes a comprehensive test suite covering configuration, JWT verification, middleware, and tools:
-```bash
-uv run pytest -v
-```
-
-### Code Formatting & Linting
-Enforce clean coding standards using `ruff`:
-```bash
-# Check code
-uv run ruff check .
-
-# Auto-fix issues & format
-uv run ruff check --fix .
-uv run ruff format .
-```
-
-### Adding New Tools
-To add a new tool to `livekit-mcp`:
-1. Create a module in `src/livekit_mcp/tools/<domain>.py`.
-2. Define a registration function:
-   ```python
-   from mcp.server.mcpserver import MCPServer
-
-   def register_telephony_tools(server: MCPServer) -> None:
-       @server.tool(name="trigger_call", description="Trigger an outbound call")
-       async def trigger_call(phone_number: str, prompt: str) -> str:
-           # Call LktClient here
-           return f"Call initiated to {phone_number}"
-   ```
-3. Register the function in `src/livekit_mcp/server.py` inside `create_mcp_server()`.
-4. Add unit tests in `tests/test_<domain>.py`.
-
----
-
-## 📚 Agentic Memory
-
-This repository adheres to the **Agentic Memory** pattern. Before making architectural changes, review the Obsidian knowledge vault at `obsidian/`:
-- `obsidian/Home.md` — Project navigation hub
-- `obsidian/Architecture/Overview.md` — System design & topology
-- `obsidian/Development/Current Sprint.md` — Active development status
-- `obsidian/Development/TODO.md` — Upcoming roadmap
-- `obsidian/Knowledge/Coding Standards.md` — Code conventions
-
----
-
-## 📄 License
-
-Proprietary © MantraCare. All rights reserved.
+- **Token Generation**:
+  ```bash
+  uv run python scripts/generate_token.py --user "test-agent" --hours 24
+  ```
