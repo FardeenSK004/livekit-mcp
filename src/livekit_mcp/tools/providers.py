@@ -205,7 +205,7 @@ def register_provider_tools(
         # Format output
         formatted_date = target_date.strftime("%A, %b %d, %Y")
         response_lines = [
-            f"📅 **Available Providers for {org_name} on {formatted_date}** (Timezone: {org_tz}):\n"
+            f" **Available Providers for {org_name} on {formatted_date}** (Timezone: {org_tz}):\n"
         ]
 
         # Group by provider

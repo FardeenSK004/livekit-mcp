@@ -73,7 +73,7 @@ def register_doctor_availability_tool(server: MCPServer) -> None:
             return f"No doctors or providers are available for Organization {org_id} on {formatted_date_str}."
 
         lines = [
-            f"📅 **Available Doctors on {formatted_date_str}** (Local Timezone: {target_tz}):\n",
+            f"Available Doctors on {formatted_date_str} (Local Timezone: {target_tz}):\n",
         ]
 
         # 3. Format each provider and convert their UTC slots to local time
@@ -95,7 +95,7 @@ def register_doctor_availability_tool(server: MCPServer) -> None:
             else:
                 slots_text = "No open slots"
 
-            lines.append(f"{i}. **{name}** (User ID: {user_id})\n   • Available Slots: {slots_text}\n")
+            lines.append(f"{i}. {name} (User ID: {user_id})\n   • Available Slots: {slots_text}\n")
 
         caller_info = f" | Caller Phone: {caller_phone}" if caller_phone else ""
         lines.append(f"**Org ID:** {org_id}{caller_info}")
