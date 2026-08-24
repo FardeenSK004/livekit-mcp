@@ -3,12 +3,12 @@
 import logging
 from datetime import UTC, datetime
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
 
 
-def register_greeting_tool(server: MCPServer) -> None:
+def register_greeting_tool(server: FastMCP) -> None:
     """Register the greeting tool with the MCP server."""
 
     @server.tool(

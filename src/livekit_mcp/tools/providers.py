@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 from livekit_mcp.clients.db_client import DatabaseClient
 from livekit_mcp.config import Settings, get_settings
@@ -96,7 +96,7 @@ def format_utc_to_local_times(
 
 
 def register_provider_tools(
-    server: MCPServer,
+    server: FastMCP,
     db_client: DatabaseClient | None = None,
     settings: Settings | None = None,
 ) -> None:

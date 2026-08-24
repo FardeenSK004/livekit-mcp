@@ -3,11 +3,12 @@
 from datetime import UTC, datetime
 import logging
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Mount, Route
 
 from livekit_mcp.auth.middleware import AuthMiddleware
 from livekit_mcp.config import Settings, get_settings
@@ -18,13 +19,12 @@ from livekit_mcp.tools.providers import register_provider_tools
 logger = logging.getLogger(__name__)
 
 
-def create_mcp_server(settings: Settings | None = None) -> MCPServer:
-    """Create and configure the underlying MCP server instance."""
+def create_mcp_server(settings: Settings | None = None) -> FastMCP:
+    """Create and configure the underlying FastMCP server instance."""
     app_settings = settings or get_settings()
 
-    server = MCPServer(
+    server = FastMCP(
         name="livekit-mcp",
-        version="0.1.0",
         instructions=(
             "LiveKit MCP Server provides tools to interact with the MantraCare "
             "voice agent engine, telephony trunks, call logs, knowledge base, "
@@ -41,32 +41,20 @@ def create_mcp_server(settings: Settings | None = None) -> MCPServer:
 
 
 def create_app(settings: Settings | None = None) -> Starlette:
-    """Create the full Starlette application with SSE transport and auth middleware."""
+    """Create the full Starlette application with official SSE transport and auth middleware."""
     app_settings = settings or get_settings()
     server = create_mcp_server(app_settings)
 
-    # Configure transport security allowing local, test, and configured hosts
-    transport_security = TransportSecuritySettings(
-        enable_dns_rebinding_protection=app_settings.is_production,
-        allowed_hosts=[
-            "127.0.0.1:*",
-            "localhost:*",
-            "[::1]:*",
-            "testserver",
-            "testserver:*",
-            f"{app_settings.host}:*",
-        ],
-        allowed_origins=[
-            "http://127.0.0.1:*",
-            "http://localhost:*",
-            "http://[::1]:*",
-            "http://testserver",
-            "http://testserver:*",
-        ],
-    )
+    sse = SseServerTransport("/messages/")
 
-    # Build base MCP Starlette application with transport security
-    app = server.sse_app(transport_security=transport_security)
+    async def handle_sse(request: Request) -> Response:
+        async with sse.connect_sse(request.scope, request.receive, request._send) as (read_stream, write_stream):
+            await server._mcp_server.run(
+                read_stream,
+                write_stream,
+                server._mcp_server.create_initialization_options(),
+            )
+        return Response()
 
     # Health check route
     async def health_endpoint(request: Request) -> JSONResponse:
@@ -89,12 +77,12 @@ def create_app(settings: Settings | None = None) -> Starlette:
                 "message": "LiveKit MCP Server is running",
                 "docs": "/health",
                 "sse_endpoint": "/sse",
-                "messages_endpoint": "/messages",
-                "tools_call_endpoint": "/api/tools/call",
+                "messages_endpoint": "/messages/",
+                "protocol": "Model Context Protocol (JSON-RPC 2.0 / SSE)",
             }
         )
 
-    # Direct tool call endpoint for internal microservices (e.g. lkt voice agent)
+    # Direct tool call endpoint for legacy compatibility
     async def call_tool_endpoint(request: Request) -> JSONResponse:
         try:
             body = await request.json()
@@ -111,10 +99,16 @@ def create_app(settings: Settings | None = None) -> Starlette:
             logger.error("Error executing tool in call_tool_endpoint: %s", e)
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
-    # Add custom routes
-    app.add_route("/health", health_endpoint, methods=["GET"])
-    app.add_route("/", root_endpoint, methods=["GET"])
-    app.add_route("/api/tools/call", call_tool_endpoint, methods=["POST"])
+    # Create Starlette app with routes & SSE transport mount
+    routes = [
+        Route("/sse", endpoint=handle_sse),
+        Mount("/messages", app=sse.handle_post_message),
+        Route("/health", endpoint=health_endpoint, methods=["GET"]),
+        Route("/", endpoint=root_endpoint, methods=["GET"]),
+        Route("/api/tools/call", endpoint=call_tool_endpoint, methods=["POST"]),
+    ]
+
+    app = Starlette(routes=routes)
 
     # Add AuthMiddleware
     app.add_middleware(AuthMiddleware, settings=app_settings)
