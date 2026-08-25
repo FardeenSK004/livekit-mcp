@@ -2,6 +2,18 @@
 
 All notable changes to the `livekit-mcp` project are documented in this file.
 
+## [0.2.0] - 2026-08-25
+
+### Added
+- **Developer Landing Dashboard & Diagnostics UI**: Designed a clean, dark-themed developer landing page (`src/livekit_mcp/templates/dashboard.html`) showing system diagnostics, uptime, configuration environment, and a dynamically-populated catalog of registered MCP tools and their schemas.
+- **Diagnostic Helper API Endpoints**: Created public endpoints `/api/dev/check-db` (checking PostgreSQL availability) and `/api/dev/check-lkt` (verifying LKT voice agent engine status) to support system checks in the landing interface.
+- **JWT Development Token Sandbox Endpoint**: Added a POST endpoint `/api/dev/token` (bypassed in production) to sign local JWT testing tokens for developer convenience.
+- **Middleware Public Paths Bypass**: Updated `AuthMiddleware` to allow public access to dashboard, dev diagnostics, and token helpers.
+
+### Fixed
+- **Doctor Availability Tool kwargs Undefined Bug**: Resolved a linter/runtime issue in `receive_doctor_availability` where `kwargs` was accessed but not defined in the function signature, by adding `**kwargs: Any` to the signature and direct list iteration.
+- **Call Tool Output Extraction**: Fixed a compatibility bug in `call_tool_endpoint` handling both FastMCP `CallToolResult` objects and raw `list` content responses.
+
 ## [0.1.0] - 2026-08-22
 
 ### Added

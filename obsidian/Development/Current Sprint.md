@@ -1,7 +1,7 @@
 # Current Sprint
 
 > **Sprint:** 0.1.0 Initial Setup & Doctor Availability  
-> **Last Updated:** 2026-08-22  
+> **Last Updated:** 2026-08-25  
 > **Status:** Active
 
 - [x] **Project Scaffolding (2026-08-20):** Structured project using Python 3.11+ and `uv`, configured `pyproject.toml` with build backend, dev dependencies, `ruff`, and `pytest`.
@@ -14,3 +14,5 @@
 - [x] **International Timezone Resolution (2026-08-22):** Integrated Google's `phonenumbers` engine (`src/livekit_mcp/utils/timezone.py`) to auto-detect caller country/timezone from phone number (`+1` US -> EDT, `+44` UK -> GMT/BST, `+91` India -> IST, `+971` UAE -> GST, `+61` Australia -> AEST) and convert UTC slots dynamically.
 - [x] **Integration Contract (`structure.json` & `format.json`) (2026-08-22):** Created minimal 1:1 schema contracts for backend developer.
 - [x] **Automated Test Suite (2026-08-22):** 27 unit & integration tests passing 100% across auth, config, greeting, provider search, doctor availability receiver, and international timezone conversions.
+- [x] **Developer Landing Dashboard & Diagnostics UI (2026-08-25):** Created a clean, simplified developer landing console at `/` with PostgreSQL/LKT diagnostics and dynamic tool catalog schemas.
+

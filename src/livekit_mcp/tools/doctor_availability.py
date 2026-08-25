@@ -1,7 +1,7 @@
 """Doctor / Provider availability receiver tool supporting multiple providers and international timezones."""
 
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -31,6 +31,7 @@ def register_doctor_availability_tool(server: FastMCP) -> None:
         providers: list[dict[str, Any]] | None = None,
         caller_phone: str | None = None,
         timezone: str | None = None,
+        **kwargs: Any,
     ) -> str:
         """Process and format availability for doctors/providers received from backend.
 
@@ -83,7 +84,7 @@ def register_doctor_availability_tool(server: FastMCP) -> None:
         lines = []
 
         # 3. Format each provider
-        for i, provider in enumerate(provider_list, 1):
+        for provider in provider_list:
             doc_name = provider.get("name", "Doctor")
             raw_slots = provider.get("available_slots", [])
 

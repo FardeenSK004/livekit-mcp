@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveKit MCP Server</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0B0E17;
+            --bg-surface: #121824;
+            --border-color: #222E45;
+            --text-primary: #F3F4F6;
+            --text-secondary: #9CA3AF;
+            --text-muted: #6B7280;
+            --accent-primary: #5F5FFA;
+            --accent-primary-hover: #4E4EE6;
+            --accent-success: #10B981;
+            --accent-warning: #F59E0B;
+            --accent-error: #EF4444;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            padding-bottom: 3rem;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--bg-surface);
+            padding: 1.25rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-left p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-success {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--accent-success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-pulse {
+            width: 8px;
+            height: 8px;
+            background-color: currentColor;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: .4;
+                transform: scale(1.2);
+            }
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        .card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 640px) {
+            .grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .meta-item {
+            margin-bottom: 1rem;
+        }
+
+        .meta-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .meta-value {
+            font-family: var(--font-mono);
+            font-size: 0.87rem;
+            word-break: break-all;
+            background-color: rgba(255, 255, 255, 0.03);
+            padding: 0.35rem 0.5rem;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .diagnostic-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .diagnostic-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .diag-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .diag-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .diag-status-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+            display: inline-block;
+        }
+
+        .status-dot.healthy {
+            background-color: var(--accent-success);
+            box-shadow: 0 0 8px var(--accent-success);
+        }
+
+        .status-dot.unhealthy {
+            background-color: var(--accent-error);
+            box-shadow: 0 0 8px var(--accent-error);
+        }
+
+        .status-dot.loading {
+            background-color: var(--accent-warning);
+            animation: pulse-ring 1s infinite;
+        }
+
+        button {
+            background-color: var(--accent-primary);
+            color: #fff;
+            border: 1px solid transparent;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: var(--font-sans);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+        }
+
+        button:hover {
+            background-color: var(--accent-primary-hover);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        button.btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        button.btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-color-hover);
+        }
+
+        .tools-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .tool-card {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            background-color: rgba(255, 255, 255, 0.01);
+        }
+
+        .tool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .tool-name {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--accent-primary);
+            font-size: 0.95rem;
+        }
+
+        .tool-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .params-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.35rem;
+        }
+
+        .params-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .param-badge {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+        }
+
+        .param-badge.required {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #FFA5A5;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <h1>📡 LiveKit MCP Server</h1>
+            <p>Model Context Protocol 2.0 Gateway & Diagnostics</p>
+        </div>
+        <div>
+            <div class="badge badge-success">
+                <span class="badge-pulse"></span>
+                Active
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Server Diagnostics -->
+        <div>
+            <div class="section-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                System Status & Diagnostics
+            </div>
+            <div class="card">
+                <div class="grid-2">
+                    <div>
+                        <div class="meta-item">
+                            <div class="meta-label">Uptime</div>
+                            <div class="meta-value" id="uptime-val">Loading...</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Environment</div>
+                            <div class="meta-value">{{ENVIRONMENT}}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="meta-label" style="margin-bottom: 0.5rem;">Service Connections</div>
+                        
+                        <div class="diagnostic-row">
+                            <div class="diag-info">
+                                <span class="diag-name">PostgreSQL Database</span>
+                                <span class="diag-status-text" id="db-status-msg">Connecting...</span>
+                            </div>
+                            <div class="diag-indicator">
+                                <span class="status-dot loading" id="db-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <div class="diagnostic-row">
+                            <div class="diag-info">
+                                <span class="diag-name">LKT Telephony Service</span>
+                                <span class="diag-status-text" id="lkt-status-msg">Pinging...</span>
+                            </div>
+                            <div class="diag-indicator">
+                                <span class="status-dot loading" id="lkt-status-dot"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.5rem; text-align: right; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <button class="btn-secondary" id="btn-recheck" onclick="checkServices()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        Retest Connections
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registered MCP Tools -->
+        <div>
+            <div class="section-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                Registered MCP Tools (Catalog)
+            </div>
+            <div class="card">
+                <div class="tools-list" id="tools-list-container">
+                    <!-- Injected dynamically -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Injected registered tools from FastAPI/Starlette template parameters
+        const tools = {{TOOLS_JSON}};
+
+        // Initialize page
+        document.addEventListener("DOMContentLoaded", () => {
+            renderToolsList();
+            checkServices();
+            updateUptime();
+            setInterval(updateUptime, 5000);
+        });
+
+        // Track uptime
+        const serverStartupTime = new Date("{{STARTUP_TIME}}");
+        function updateUptime() {
+            const diffMs = new Date() - serverStartupTime;
+            const diffSec = Math.floor(diffMs / 1000);
+            
+            const days = Math.floor(diffSec / 86400);
+            const hours = Math.floor((diffSec % 86400) / 3600);
+            const minutes = Math.floor((diffSec % 3600) / 60);
+            const seconds = diffSec % 60;
+            
+            let uptimeStr = "";
+            if (days > 0) uptimeStr += `${days}d `;
+            if (hours > 0 || days > 0) uptimeStr += `${hours}h `;
+            uptimeStr += `${minutes}m ${seconds}s`;
+            
+            document.getElementById("uptime-val").textContent = uptimeStr;
+        }
+
+        // Render the tool catalog
+        function renderToolsList() {
+            const container = document.getElementById("tools-list-container");
+            container.innerHTML = "";
+
+            if (tools.length === 0) {
+                container.innerHTML = `<div style="font-size:0.875rem; color:var(--text-muted); padding:2rem; border:1px dashed var(--border-color); border-radius:6px; text-align:center;">No registered tools cataloged</div>`;
+                return;
+            }
+
+            tools.forEach(tool => {
+                const toolCard = document.createElement("div");
+                toolCard.className = "tool-card";
+                
+                const schema = tool.inputSchema || {};
+                const props = schema.properties || {};
+                const requiredProps = schema.required || [];
+                
+                let paramsHTML = "";
+                const keys = Object.keys(props);
+                if (keys.length === 0) {
+                    paramsHTML = `<span style="font-size:0.75rem; color:var(--text-muted);">No input parameters</span>`;
+                } else {
+                    keys.forEach(key => {
+                        const info = props[key];
+                        const isRequired = requiredProps.includes(key);
+                        paramsHTML += `
+                            <span class="param-badge ${isRequired ? 'required' : ''}">
+                                ${key}${isRequired ? '*' : ''}: ${info.type || 'any'}
+                            </span>
+                        `;
+                    });
+                }
+
+                toolCard.innerHTML = `
+                    <div class="tool-header">
+                        <span class="tool-name">${tool.name}</span>
+                    </div>
+                    <div class="tool-desc">${tool.description || 'No description provided.'}</div>
+                    <div>
+                        <div class="params-title">Arguments Schema</div>
+                        <div class="params-list">
+                            ${paramsHTML}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(toolCard);
+            });
+        }
+
+        // Diagnostic checker
+        async function checkServices() {
+            const btn = document.getElementById("btn-recheck");
+            btn.disabled = true;
+
+            const dbDot = document.getElementById("db-status-dot");
+            const dbMsg = document.getElementById("db-status-msg");
+            const lktDot = document.getElementById("lkt-status-dot");
+            const lktMsg = document.getElementById("lkt-status-msg");
+
+            dbDot.className = "status-dot loading";
+            dbMsg.textContent = "Connecting...";
+            lktDot.className = "status-dot loading";
+            lktMsg.textContent = "Pinging...";
+
+            // Check database
+            try {
+                const dbRes = await fetch("/api/dev/check-db");
+                const dbData = await dbRes.json();
+                if (dbRes.ok) {
+                    dbDot.className = "status-dot healthy";
+                    dbMsg.textContent = "Online";
+                } else {
+                    dbDot.className = "status-dot unhealthy";
+                    dbMsg.textContent = dbData.message || "Failed";
+                }
+            } catch (e) {
+                dbDot.className = "status-dot unhealthy";
+                dbMsg.textContent = "Network Error";
+            }
+
+            // Check LKT service
+            try {
+                const lktRes = await fetch("/api/dev/check-lkt");
+                const lktData = await lktRes.json();
+                if (lktRes.ok) {
+                    lktDot.className = "status-dot healthy";
+                    lktMsg.textContent = `Online (Status ${lktData.code})`;
+                } else {
+                    lktDot.className = "status-dot unhealthy";
+                    lktMsg.textContent = lktData.message || "Connection refused";
+                }
+            } catch (e) {
+                lktDot.className = "status-dot unhealthy";
+                lktMsg.textContent = "Connection refused";
+            }
+
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>
