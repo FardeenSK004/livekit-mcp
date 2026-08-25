@@ -64,6 +64,15 @@ class AuthMiddleware:
         token = self._extract_token(request)
 
         if not token:
+            if not self.settings.is_production:
+                logger.info("Dev mode: Request to %s without token allowed with anonymous-dev state", path)
+                self._inject_auth_state(
+                    scope,
+                    JWTPayload(sub="anonymous-dev", scope="mcp:all"),
+                )
+                await self.app(scope, receive, send)
+                return
+
             logger.warning("Unauthorized request to %s: Missing token", path)
             response = JSONResponse(
                 status_code=401,

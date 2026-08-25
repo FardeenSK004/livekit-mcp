@@ -1,8 +1,8 @@
 """Timezone resolution and conversion utilities based on phone numbers and IANA timezones."""
 
+from datetime import UTC, date, datetime, time, timedelta
 import logging
 import re
-from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo
 
 import phonenumbers
@@ -30,13 +30,15 @@ def get_timezone_from_phone(phone_number: str | None, default_tz: str = "UTC") -
         return default_tz
 
     cleaned = str(phone_number).strip().replace(" ", "").replace("-", "")
-    if not cleaned.startswith("+"):
+    if len(cleaned) == 10 and not cleaned.startswith("+"):
+        cleaned = "+91" + cleaned
+    elif not cleaned.startswith("+"):
         cleaned = "+" + cleaned
 
     try:
         parsed = phonenumbers.parse(cleaned, None)
         if not phonenumbers.is_valid_number(parsed):
-            logger.warning("Invalid phone number format for timezone lookup: %s", phone_number)
+            logger.info("Phone %s parsed as national/local format, defaulting to %s", phone_number, default_tz)
             return default_tz
 
         tz_list = phone_tz.time_zones_for_number(parsed)
@@ -71,6 +73,72 @@ def parse_time_str(time_str: str) -> time | None:
         return time(int(match_24h.group(1)), int(match_24h.group(2)))
 
     return None
+
+
+def resolve_date_string(date_str: str | None, source_tz_str: str = "Asia/Kolkata") -> date:
+    """Resolve strings like 'today', 'tomorrow', 'yesterday', '2026-08-25' into a date object."""
+    try:
+        source_tz = ZoneInfo(source_tz_str)
+    except Exception:
+        source_tz = ZoneInfo("UTC")
+
+    now_local = datetime.now(source_tz).date()
+
+    if not date_str or not str(date_str).strip():
+        return now_local
+
+    cleaned = str(date_str).strip().lower()
+
+    if cleaned in ("today", "now"):
+        return now_local
+    if cleaned == "tomorrow":
+        return now_local + timedelta(days=1)
+    if cleaned == "yesterday":
+        return now_local - timedelta(days=1)
+
+    # Try ISO or YYYY-MM-DD
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(cleaned[:10], fmt).date()
+        except ValueError:
+            pass
+
+    return now_local
+
+
+def to_utc_iso_string(
+    date_str: str,
+    time_str: str | None = None,
+    source_tz_str: str = "UTC",
+) -> str:
+    """Convert a local date (and optional time) string into an ISO 8601 UTC timestamp string.
+
+    Examples:
+        - to_utc_iso_string('today', source_tz_str='Asia/Kolkata') -> '2026-08-25T00:00:00.000Z'
+        - to_utc_iso_string('2026-08-25', '10:00', source_tz_str='America/New_York') -> '2026-08-25T14:00:00.000Z'
+    """
+    try:
+        source_tz = ZoneInfo(source_tz_str)
+    except Exception:
+        source_tz = ZoneInfo("UTC")
+
+    try:
+        # If date_str is already ISO format (e.g. contains 'T' and 'Z')
+        if date_str and "T" in str(date_str):
+            dt = datetime.fromisoformat(str(date_str).replace("Z", "+00:00"))
+            return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        # Resolve date
+        d = resolve_date_string(date_str, source_tz_str)
+        t = parse_time_str(time_str) if time_str else time(0, 0, 0)
+        if not t:
+            t = time(0, 0, 0)
+
+        dt_local = datetime.combine(d, t, tzinfo=source_tz)
+        dt_utc = dt_local.astimezone(UTC)
+        return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    except Exception:
+        return datetime.now(UTC).strftime("%Y-%m-%dT00:00:00.000Z")
 
 
 def convert_utc_slot_to_local(

@@ -56,7 +56,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     # Register tools
     register_greeting_tool(server)
     register_provider_tools(server, settings=app_settings)
-    register_doctor_availability_tool(server)
+    register_doctor_availability_tool(server, settings=app_settings)
 
     return server
 

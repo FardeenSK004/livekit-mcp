@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     jwt_issuer: str | None = Field(default=None, validation_alias="JWT_ISSUER")
     jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")
 
+    # MantraAssist Backend HTTP API Endpoint (:5500)
+    mantraassist_backend_url: str = Field(
+        default="http://localhost:5500",
+        validation_alias="MANTRAASSIST_BACKEND_URL",
+    )
+
     # MantraAssist PostgreSQL Database (assist_db)
     database_url: str = Field(
         default="postgresql://user:admin@77413@localhost:5433/assist_db",

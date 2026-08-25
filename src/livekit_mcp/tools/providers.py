@@ -1,7 +1,7 @@
 """Provider availability search tools for LiveKit Voice Agents."""
 
-import logging
 from datetime import UTC, date, datetime, time
+import logging
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -60,38 +60,36 @@ def is_date_matching_recurrence(target_date: date, recurrence_rule: str | None) 
     return False
 
 
-def format_utc_to_local_times(
+def convert_utc_time_to_tz(
+    utc_time: time,
     target_date: date,
-    utc_start: time | None,
-    utc_end: time | None,
-    timezone_str: str = "Asia/Kolkata",
-) -> tuple[str, str, str]:
-    """Convert UTC start and end time to localized readable 12-hour strings.
-
-    Returns:
-        tuple of (local_start_str, local_end_str, tz_name)
-    """
-    if utc_start is None or utc_end is None:
-        return "N/A", "N/A", timezone_str
-
+    target_tz_str: str,
+) -> tuple[str, str]:
+    """Convert UTC time to localized 12-hour formatted time string."""
     try:
-        local_tz = ZoneInfo(timezone_str)
+        local_tz = ZoneInfo(target_tz_str)
     except Exception:
-        local_tz = ZoneInfo("Asia/Kolkata")
-        timezone_str = "Asia/Kolkata"
+        local_tz = ZoneInfo("UTC")
+        target_tz_str = "UTC"
 
-    # Construct timezone-aware UTC datetime
-    start_dt_utc = datetime.combine(target_date, utc_start, tzinfo=UTC)
-    end_dt_utc = datetime.combine(target_date, utc_end, tzinfo=UTC)
+    dt_utc = datetime.combine(target_date, utc_time, tzinfo=UTC)
+    dt_local = dt_utc.astimezone(local_tz)
 
-    # Convert to local timezone
-    start_dt_local = start_dt_utc.astimezone(local_tz)
-    end_dt_local = end_dt_utc.astimezone(local_tz)
+    formatted_time = dt_local.strftime("%I:%M %p").lstrip("0")
+    tz_abbrev = dt_local.strftime("%Z") or target_tz_str
 
-    start_str = start_dt_local.strftime("%I:%M %p").lstrip("0")
-    end_str = end_dt_local.strftime("%I:%M %p").lstrip("0")
-    tz_abbrev = start_dt_local.strftime("%Z") or timezone_str
+    return formatted_time, tz_abbrev
 
+
+def format_slot_range(
+    start_time: time,
+    end_time: time,
+    target_date: date,
+    target_tz_str: str,
+) -> tuple[str, str, str]:
+    """Format start and end time range in target timezone."""
+    start_str, tz_abbrev = convert_utc_time_to_tz(start_time, target_date, target_tz_str)
+    end_str, _ = convert_utc_time_to_tz(end_time, target_date, target_tz_str)
     return start_str, end_str, tz_abbrev
 
 
@@ -108,21 +106,25 @@ def register_provider_tools(
         name="search_provider_availability",
         description=(
             "Search available doctors and healthcare providers for an organization on a given date. "
-            "Automatically converts UTC database working hours to the organization's local timezone (e.g. IST). "
-            "Returns doctor names, specializations, contact information, available hours, and capacity."
+            "Supports filtering by doctor name, specialization, or department. "
+            "Automatically converts UTC database working hours to the organization's local timezone (e.g. IST)."
         ),
     )
     async def search_provider_availability(
-        org_id: int,
+        org_id: int | str,
         query_date: str,
         query: str | None = None,
+        department: str | None = None,
+        caller_phone: str | None = None,
     ) -> str:
         """Search provider availability in assist_db.
 
         Args:
             org_id: Organization ID (e.g. 66).
             query_date: Target date to search in 'YYYY-MM-DD' format (e.g. '2026-08-25').
-            query: Optional search keyword to filter by doctor name or specialization.
+            query: Optional search keyword to filter by doctor name.
+            department: Optional medical department or specialization filter.
+            caller_phone: Optional caller phone number for timezone detection.
 
         Returns:
             Formatted voice-ready string detailing available doctors and their time slots.
@@ -134,10 +136,11 @@ def register_provider_tools(
             return f"Error: Invalid date format '{query_date}'. Please use YYYY-MM-DD (e.g. 2026-08-25)."
 
         logger.info(
-            "Searching provider availability: org_id=%d, date=%s, query=%s",
+            "Searching provider availability: org_id=%d, date=%s, query=%s, department=%s",
             org_id,
             query_date,
             query,
+            department,
         )
 
         sql_query = """
@@ -173,19 +176,24 @@ def register_provider_tools(
                   OR p.name ILIKE '%' || $3 || '%'
                   OR p.specialization ILIKE '%' || $3 || '%'
               )
+              AND (
+                  $4::text IS NULL
+                  OR p.specialization ILIKE '%' || $4 || '%'
+              )
             ORDER BY p.name ASC, pa.start_time ASC
         """
 
         try:
             filter_arg = query.strip() if query and query.strip() else None
-            rows = await database.fetch(sql_query, org_id, target_date, filter_arg)
+            dept_arg = department.strip() if department and department.strip() else None
+            rows = await database.fetch(sql_query, org_id, target_date, filter_arg, dept_arg)
         except Exception as e:
             logger.error("Failed to query provider_availability in assist_db: %s", str(e))
             return f"Error querying database: {e}"
 
         if not rows:
             formatted_date = target_date.strftime("%A, %b %d, %Y")
-            filter_text = f" matching '{query}'" if query else ""
+            filter_text = f" matching '{query}'" if query else (f" in {department}" if department else "")
             return f"No active provider schedules found for Organization {org_id} on {formatted_date}{filter_text}."
 
         # Filter rows by recurrence rule
@@ -205,7 +213,7 @@ def register_provider_tools(
         # Format output
         formatted_date = target_date.strftime("%A, %b %d, %Y")
         response_lines = [
-            f" **Available Providers for {org_name} on {formatted_date}** (Timezone: {org_tz}):\n"
+            f" Available Providers for {org_name} on {formatted_date} (Timezone: {org_tz}):\n"
         ]
 
         # Group by provider
@@ -220,23 +228,17 @@ def register_provider_tools(
                     "slots": [],
                 }
 
-            start_str, end_str, tz_abbrev = format_utc_to_local_times(
-                target_date=target_date,
-                utc_start=slot["start_time"],
-                utc_end=slot["end_time"],
-                timezone_str=org_tz,
-            )
-
+            start_t = slot["start_time"]
+            end_t = slot["end_time"]
+            start_str, end_str, tz_abbrev = format_slot_range(start_t, end_t, target_date, org_tz)
             cap = slot["capacity"]
-            cap_str = f" (Capacity: {cap} slots)" if cap is not None else ""
+            cap_str = f" (Max: {cap} patients)" if cap else ""
             providers_dict[pid]["slots"].append(f"{start_str} – {end_str} {tz_abbrev}{cap_str}")
 
-        for i, (pid, pdata) in enumerate(providers_dict.items(), 1):
+        for _, pdata in providers_dict.items():
+            slot_list = ", ".join(pdata["slots"])
             response_lines.append(
-                f"{i}. **{pdata['name']}** — *{pdata['specialization']}*\n"
-                f"   • Available Working Hours: {', '.join(pdata['slots'])}\n"
-                f"   • Provider ID: {pid}"
-                + (f" | Phone: {pdata['phone']}" if pdata["phone"] else "")
+                f"• {pdata['name']} ({pdata['specialization']}): Available at {slot_list}."
             )
 
         return "\n".join(response_lines)
