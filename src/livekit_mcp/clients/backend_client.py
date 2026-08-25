@@ -28,7 +28,7 @@ class MantraAssistBackendClient:
         caller_tz: str | None = None,
         timeout: float = 5.0,
     ) -> list[dict[str, Any]] | None:
-        """Fetch calculated doctor availability from MantraAssist-backend endpoint.
+        """Fetch calculated doctor availability from MantraAssist-backend webhook endpoint.
 
         Guaranteed fixed schema sent in UTC every time:
             - org_id: Organization ID (or "" if missing)
@@ -38,13 +38,12 @@ class MantraAssistBackendClient:
             - department: Department / Specialization (or "" if missing)
             - caller_phone: Caller phone number (if available)
 
-        Calls: GET /api/v1/providers/availability?org_id={org_id}&date={date}&datetime={datetime}&doc_name={doc_name}&department={department}
-        Or: POST /api/v1/providers/availability
+        Calls: POST /api/v1/webhooks/mcp (or GET /api/v1/webhooks/mcp)
 
         Returns:
             List of provider objects with UTC time slots, or None if request fails.
         """
-        url = f"{self.base_url}/api/v1/providers/availability"
+        url = f"{self.base_url}/api/v1/webhooks/mcp"
 
         org_id_val = org_id if org_id is not None else ""
         doc_name_val = str(doctor_name).strip() if doctor_name and str(doctor_name).strip() else ""
@@ -70,20 +69,20 @@ class MantraAssistBackendClient:
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                # 1. Try GET request
-                logger.info("Querying MantraAssist backend GET %s with UTC params %s", url, params)
-                resp = await client.get(url, params=params)
+                # 1. Try POST request first (standard webhook method)
+                logger.info("Querying MantraAssist backend POST %s with UTC payload %s", url, params)
+                resp = await client.post(url, json=params)
 
                 if resp.status_code == 200:
                     data = resp.json()
                     return self._extract_providers(data)
 
-                # 2. Try POST fallback if GET returns 404/405
+                # 2. Try GET request fallback if POST returns 404/405
                 if resp.status_code in (404, 405):
-                    logger.info("Retrying with POST %s", url)
-                    post_resp = await client.post(url, json=params)
-                    if post_resp.status_code == 200:
-                        data = post_resp.json()
+                    logger.info("Retrying with GET %s", url)
+                    get_resp = await client.get(url, params=params)
+                    if get_resp.status_code == 200:
+                        data = get_resp.json()
                         return self._extract_providers(data)
 
                 logger.warning(
