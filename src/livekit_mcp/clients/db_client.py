@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 class DatabaseClient:
     """Async database client managing asyncpg connection pool to assist_db."""
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, db_url: str | None = None):
         self.settings = settings
-        self.db_url = settings.effective_db_url
+        self.db_url = db_url or settings.effective_db_url
         self._pool: asyncpg.Pool | None = None
 
     async def get_pool(self) -> asyncpg.Pool:

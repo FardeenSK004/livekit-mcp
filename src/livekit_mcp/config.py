@@ -58,6 +58,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="ASSIST_DB_URL",
     )
+    mcp_events_db_url: str | None = Field(
+        default=None,
+        validation_alias="MCP_EVENTS_DB_URL",
+    )
 
     # LKT Voice Agent & Telephony Service
     lkt_api_base_url: str = Field(

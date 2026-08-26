@@ -21,7 +21,8 @@ async def save_mcp_event(
 ) -> None:
     """Save a single event to the mcp_events audit table."""
     settings = get_settings()
-    db_client = DatabaseClient(settings)
+    # Use dedicated MCP events database if configured, otherwise fallback to default
+    db_client = DatabaseClient(settings, db_url=settings.mcp_events_db_url)
     
     try:
         pool = await db_client.get_pool()
