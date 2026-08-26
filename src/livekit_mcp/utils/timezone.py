@@ -99,7 +99,14 @@ def resolve_date_string(date_str: str | None, source_tz_str: str = "Asia/Kolkata
     # Try ISO or YYYY-MM-DD
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y"):
         try:
-            return datetime.strptime(cleaned[:10], fmt).date()
+            parsed_d = datetime.strptime(cleaned[:10], fmt).date()
+            # If parsed date year is in the past (e.g. 2025 when today is 2026), roll forward to current year
+            if parsed_d.year < now_local.year:
+                try:
+                    parsed_d = parsed_d.replace(year=now_local.year)
+                except ValueError:
+                    pass
+            return parsed_d
         except ValueError:
             pass
 
@@ -130,13 +137,17 @@ def to_utc_iso_string(
 
         # Resolve date
         d = resolve_date_string(date_str, source_tz_str)
-        t = parse_time_str(time_str) if time_str else time(0, 0, 0)
-        if not t:
-            t = time(0, 0, 0)
 
-        dt_local = datetime.combine(d, t, tzinfo=source_tz)
-        dt_utc = dt_local.astimezone(UTC)
-        return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        # If time is explicitly specified by user, convert that local time to UTC
+        if time_str and str(time_str).strip():
+            t = parse_time_str(time_str)
+            if t:
+                dt_local = datetime.combine(d, t, tzinfo=source_tz)
+                dt_utc = dt_local.astimezone(UTC)
+                return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        # If time is not specified by the user, send 00:00:00.000Z on the target date
+        return f"{d.strftime('%Y-%m-%d')}T00:00:00.000Z"
     except Exception:
         return datetime.now(UTC).strftime("%Y-%m-%dT00:00:00.000Z")
 

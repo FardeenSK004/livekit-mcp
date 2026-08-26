@@ -40,6 +40,14 @@ class Settings(BaseSettings):
         default="http://localhost:5500",
         validation_alias="MANTRAASSIST_BACKEND_URL",
     )
+    mantraassist_client_id: str | None = Field(
+        default=None,
+        validation_alias="MANTRAASSIST_CLIENT_ID",
+    )
+    mantraassist_client_secret: str | None = Field(
+        default=None,
+        validation_alias="MANTRAASSIST_CLIENT_SECRET",
+    )
 
     # MantraAssist PostgreSQL Database (assist_db)
     database_url: str = Field(

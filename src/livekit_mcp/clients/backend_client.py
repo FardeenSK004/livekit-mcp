@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from livekit_mcp.config import Settings, get_settings
-from livekit_mcp.utils.timezone import to_utc_iso_string
+from livekit_mcp.utils.timezone import resolve_date_string, to_utc_iso_string
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +49,11 @@ class MantraAssistBackendClient:
         doc_name_val = str(doctor_name).strip() if doctor_name and str(doctor_name).strip() else ""
         dept_val = str(department).strip() if department and str(department).strip() else ""
 
-        # Always convert to UTC datetime format
+        # Always resolve target calendar date and UTC timestamp
         if date and str(date).strip():
-            utc_datetime_val = to_utc_iso_string(str(date).strip(), source_tz_str=caller_tz or "UTC")
-            utc_date_val = utc_datetime_val[:10]
+            target_d = resolve_date_string(str(date).strip(), caller_tz or "Asia/Kolkata")
+            utc_date_val = target_d.strftime("%Y-%m-%d")
+            utc_datetime_val = to_utc_iso_string(str(date).strip(), source_tz_str=caller_tz or "Asia/Kolkata")
         else:
             utc_datetime_val = ""
             utc_date_val = ""
@@ -67,22 +68,29 @@ class MantraAssistBackendClient:
         if caller_phone:
             params["caller_phone"] = str(caller_phone).strip()
 
+        headers: dict[str, str] = {
+            "ngrok-skip-browser-warning": "69420",
+        }
+        if self.settings.mantraassist_client_id and self.settings.mantraassist_client_secret:
+            headers["x-client-id"] = str(self.settings.mantraassist_client_id).strip()
+            headers["x-client-secret"] = str(self.settings.mantraassist_client_secret).strip()
+
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                # 1. Try POST request first (standard webhook method)
-                logger.info("Querying MantraAssist backend POST %s with UTC payload %s", url, params)
-                resp = await client.post(url, json=params)
+                # 1. Try GET request first (standard query format for backend availability)
+                logger.info("Querying MantraAssist backend GET %s with UTC params %s", url, params)
+                resp = await client.get(url, params=params, headers=headers)
 
                 if resp.status_code == 200:
                     data = resp.json()
                     return self._extract_providers(data)
 
-                # 2. Try GET request fallback if POST returns 404/405
+                # 2. Try POST request fallback if GET returns 404/405
                 if resp.status_code in (404, 405):
-                    logger.info("Retrying with GET %s", url)
-                    get_resp = await client.get(url, params=params)
-                    if get_resp.status_code == 200:
-                        data = get_resp.json()
+                    logger.info("Retrying with POST %s", url)
+                    post_resp = await client.post(url, json=params, headers=headers)
+                    if post_resp.status_code == 200:
+                        data = post_resp.json()
                         return self._extract_providers(data)
 
                 logger.warning(
