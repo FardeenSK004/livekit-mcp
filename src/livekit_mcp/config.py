@@ -49,9 +49,9 @@ class Settings(BaseSettings):
         validation_alias="MANTRAASSIST_CLIENT_SECRET",
     )
 
-    # MantraAssist PostgreSQL Database (assist_db)
+    # PostgreSQL Database (mcp_logs_db / assist_db)
     database_url: str = Field(
-        default="postgresql://user:admin@77413@localhost:5433/assist_db",
+        default="postgresql://postgres:password@localhost:5442/mcp_logs_db",
         validation_alias="DATABASE_URL",
     )
     assist_db_url: str | None = Field(
@@ -77,8 +77,9 @@ class Settings(BaseSettings):
 
     @property
     def effective_db_url(self) -> str:
-        """Return the effective database URL (ASSIST_DB_URL or DATABASE_URL)."""
-        return self.assist_db_url or self.database_url
+        """Return the effective database URL (MCP_EVENTS_DB_URL, ASSIST_DB_URL, or DATABASE_URL)."""
+        return self.mcp_events_db_url or self.assist_db_url or self.database_url
+
 
     @property
     def is_production(self) -> bool:

@@ -2,12 +2,22 @@
 
 import json
 import logging
+from collections import deque
+from datetime import UTC, datetime
 from typing import Any
 
 from livekit_mcp.clients.db_client import DatabaseClient
 from livekit_mcp.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# In-memory circular buffer of recent events for instant dashboard telemetry
+_recent_events: deque[dict[str, Any]] = deque(maxlen=100)
+
+
+def get_recent_events(limit: int = 25) -> list[dict[str, Any]]:
+    """Retrieve the most recent MCP events from the in-memory buffer."""
+    return list(_recent_events)[:limit]
 
 
 async def save_mcp_event(
@@ -19,15 +29,24 @@ async def save_mcp_event(
     event_log: str = "",
     call_id: str = "",
 ) -> None:
-    """Save a single event to the mcp_events audit table."""
+    """Save a single event to in-memory buffer and optional mcp_events audit table."""
+    now_iso = datetime.now(UTC).isoformat()
+    _recent_events.appendleft({
+        "call_id": str(call_id or ""),
+        "event_type": event_type,
+        "event_source": event_source,
+        "event_payload": event_payload,
+        "event_status": event_status,
+        "event_error": event_error or "",
+        "created_at": now_iso,
+    })
+
     settings = get_settings()
-    # Use dedicated MCP events database if configured, otherwise fallback to default
     db_client = DatabaseClient(settings, db_url=settings.mcp_events_db_url)
-    
+
     try:
         pool = await db_client.get_pool()
         async with pool.acquire() as conn:
-            # Auto-create the table if it doesn't exist
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS mcp_events (
@@ -43,7 +62,7 @@ async def save_mcp_event(
                 );
                 """
             )
-            
+
             await conn.execute(
                 """
                 INSERT INTO mcp_events (call_id, event_type, event_source, event_payload, event_log, event_status, event_error)
@@ -58,4 +77,5 @@ async def save_mcp_event(
                 event_error or "",
             )
     except Exception as e:
-        logger.warning(f"Failed to save MCP event {event_type}: {e}")
+        logger.debug(f"DB event save skipped: {e}")
+

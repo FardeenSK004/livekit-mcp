@@ -157,6 +157,8 @@ def register_doctor_availability_tool(
         # 4. Format each provider and localize slots
         for provider in provider_list:
             doc_name = provider.get("name") or provider.get("provider_name") or "Doctor"
+            uid = provider.get("user_id") or provider.get("id") or provider.get("provider_id")
+            uid_str = f" (User ID: {uid})" if uid is not None else ""
             raw_slots = provider.get("available_slots", [])
 
             if raw_slots:
@@ -175,8 +177,8 @@ def register_doctor_availability_tool(
                             )
                         )
                 slots_text = ", ".join(local_slots)
-                lines.append(f"{doc_name} is available on {formatted_date_str}: {slots_text}.")
+                lines.append(f"{doc_name}{uid_str} is available on {formatted_date_str}: {slots_text}.")
             else:
-                lines.append(f"{doc_name} has no open appointment slots on {formatted_date_str}.")
+                lines.append(f"{doc_name}{uid_str} has no open appointment slots on {formatted_date_str}.")
 
         return "\n".join(lines)

@@ -1,6 +1,6 @@
-"""HTTP Client to interact with MantraAssist-backend REST endpoints."""
-
+import json
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -71,9 +71,6 @@ class MantraAssistBackendClient:
         headers: dict[str, str] = {
             "ngrok-skip-browser-warning": "69420",
         }
-        if self.settings.mantraassist_client_id and self.settings.mantraassist_client_secret:
-            headers["x-client-id"] = str(self.settings.mantraassist_client_id).strip()
-            headers["x-client-secret"] = str(self.settings.mantraassist_client_secret).strip()
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -102,6 +99,138 @@ class MantraAssistBackendClient:
             logger.error("Failed to connect to MantraAssist backend at %s: %s", url, e)
 
         return None
+
+    # In-memory temporary cache: org_id -> (timestamp, data)
+    _processes_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+    async def get_org_processes(
+        self,
+        org_id: int | str,
+        timeout: float = 5.0,
+        ttl_seconds: float = 600.0,
+    ) -> list[dict[str, Any]]:
+        """Fetch processes and stages with descriptions for an organization.
+
+        Uses an in-memory TTL cache to avoid repeated network overhead.
+        Calls: GET /api/v1/processes?org_id={org_id} (with fallback endpoints)
+        """
+        import time
+
+        org_id_str = str(org_id).strip()
+        now = time.time()
+
+        # Check in-memory cache
+        if org_id_str in self._processes_cache:
+            cached_time, cached_data = self._processes_cache[org_id_str]
+            if (now - cached_time) < ttl_seconds:
+                logger.info("Returning %d org processes from in-memory cache for org_id=%s", len(cached_data), org_id_str)
+                return cached_data
+
+        urls = [
+            f"{self.base_url}/api/v1/webhooks/mcp/processes",
+            f"{self.base_url}/api/v1/processes",
+            f"{self.base_url}/api/v1/webhooks/mcp",
+        ]
+
+        headers: dict[str, str] = {
+            "ngrok-skip-browser-warning": "69420",
+        }
+
+        params = {"org_id": org_id_str}
+
+        for url in urls:
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    logger.info("[MA-BACKEND] Requesting Org Processes: GET %s | Params: %s | Headers: %s", url, params, headers)
+                    resp = await client.get(url, params=params, headers=headers)
+                    logger.info("[MA-BACKEND] Response HTTP %d from %s | Raw Payload: %s", resp.status_code, url, resp.text[:2000])
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        extracted = self._extract_processes(data)
+                        logger.info("[MA-BACKEND] Extracted %d normalized processes: %s", len(extracted), json.dumps(extracted, default=str))
+                        if extracted:
+                            self._processes_cache[org_id_str] = (now, extracted)
+                            return extracted
+            except Exception as e:
+                logger.warning("[MA-BACKEND] Failed querying processes at %s: %s", url, e)
+
+        return []
+
+    def _extract_processes(self, data: Any) -> list[dict[str, Any]]:
+        """Normalize process and stage response data into standardized format with descriptions."""
+        raw_list = []
+        if isinstance(data, list):
+            raw_list = data
+        elif isinstance(data, dict):
+            if "processes" in data and isinstance(data["processes"], list):
+                raw_list = data["processes"]
+            elif "data" in data and isinstance(data["data"], list):
+                raw_list = data["data"]
+            elif "data" in data and isinstance(data["data"], dict) and "processes" in data["data"]:
+                raw_list = data["data"]["processes"]
+            elif "id" in data or "process_id" in data:
+                raw_list = [data]
+
+        normalized: list[dict[str, Any]] = []
+        for p in raw_list:
+            if not isinstance(p, dict):
+                continue
+            pid = p.get("id") or p.get("process_id")
+            if pid is None:
+                continue
+            try:
+                pid_int = int(pid)
+            except (ValueError, TypeError):
+                pid_int = pid
+
+            p_name = p.get("name") or p.get("process_name") or ""
+            p_desc = p.get("description") or p.get("process_description") or ""
+
+            raw_stages = p.get("stages") or p.get("stageDetails") or []
+            stage_ids: list[int] = []
+            formatted_stages: list[dict[str, Any]] = []
+
+            for stg in raw_stages:
+                if not isinstance(stg, dict):
+                    try:
+                        s_id = int(stg)
+                        stage_ids.append(s_id)
+                        formatted_stages.append({
+                            "stage_id": s_id,
+                            "stage_name": f"Stage {s_id}",
+                            "stage_description": "",
+                        })
+                    except (ValueError, TypeError):
+                        pass
+                    continue
+
+                sid = stg.get("id") or stg.get("stage_id")
+                if sid is None:
+                    continue
+                try:
+                    sid_int = int(sid)
+                except (ValueError, TypeError):
+                    sid_int = sid
+
+                s_name = stg.get("name") or stg.get("stage_name") or ""
+                s_desc = stg.get("description") or stg.get("stage_description") or ""
+
+                stage_ids.append(sid_int)
+                formatted_stages.append({
+                    "stage_id": sid_int,
+                    "stage_name": s_name,
+                    "stage_description": s_desc,
+                })
+
+            normalized.append({
+                "process_id": pid_int,
+                "process_name": p_name,
+                "process_description": p_desc,
+                "stage_ids": stage_ids,
+                "stages": formatted_stages,
+            })
+
+        return normalized
 
     def _extract_providers(self, data: Any) -> list[dict[str, Any]]:
         """Normalize response data to standard providers list."""

@@ -17,7 +17,7 @@ from starlette.routing import Mount, Route
 from livekit_mcp.auth.middleware import AuthMiddleware
 from livekit_mcp.config import Settings, get_settings
 from livekit_mcp.tools.doctor_availability import register_doctor_availability_tool
-from livekit_mcp.tools.greeting import register_greeting_tool
+from livekit_mcp.tools.org_processes import register_org_processes_tool
 from livekit_mcp.tools.providers import register_provider_tools
 from livekit_mcp.utils.db_logger import save_mcp_event
 
@@ -47,12 +47,12 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
         instructions=(
             "LiveKit MCP Server provides tools to interact with the MantraCare "
             "voice agent engine, telephony trunks, call logs, knowledge base, "
-            "and healthcare provider availability schedules."
+            "organization processes & stages, and healthcare provider availability schedules."
         ),
     )
 
     # Register tools
-    register_greeting_tool(server)
+    register_org_processes_tool(server, settings=app_settings)
     register_provider_tools(server, settings=app_settings)
     register_doctor_availability_tool(server, settings=app_settings)
 

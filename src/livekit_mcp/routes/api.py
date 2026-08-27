@@ -43,43 +43,20 @@ def get_api_routes(server: FastMCP, app_settings: Settings, startup_time: dateti
             }
         )
 
-    # Root status endpoint serving HTML dashboard
-    async def root_endpoint(request: Request) -> HTMLResponse:
-        try:
-            template_path = Path(__file__).parent.parent / "templates" / "dashboard.html"
-            with open(template_path, encoding="utf-8") as f:
-                template = f.read()
-        except Exception as e:
-            logger.error("Failed to load dashboard HTML template: %s", e)
-            return HTMLResponse("<h1>Error: Could not load dashboard template</h1>", status_code=500)
+    # Root endpoint returning simple JSON status
+    async def root_endpoint(request: Request) -> JSONResponse:
+        return JSONResponse(
+            {
+                "status": "working",
+                "service": "livekit-mcp",
+                "version": "0.1.0",
+                "transport": "sse",
+                "auth_enabled": app_settings.auth_enabled,
+                "environment": app_settings.environment,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
-        # Get list of tools
-        tools = await server.list_tools()
-        tools_list = []
-        for t in tools:
-            tools_list.append({
-                "name": t.name,
-                "description": t.description,
-                "inputSchema": t.inputSchema
-            })
-
-        # Prepare replacements
-        replacements = {
-            "{{ENVIRONMENT}}": app_settings.environment,
-            "{{HOST}}": request.url.hostname or app_settings.host,
-            "{{PORT}}": str(request.url.port or app_settings.port),
-            "{{PROJECT_DIR}}": str(Path(__file__).parent.parent.parent.parent.resolve()),
-            "{{JWT_SECRET}}": app_settings.jwt_secret,
-            "{{DATABASE_URL}}": mask_url(app_settings.effective_db_url),
-            "{{STARTUP_TIME}}": startup_time.isoformat(),
-            "{{TOOLS_JSON}}": json.dumps(tools_list),
-        }
-
-        content = template
-        for k, v in replacements.items():
-            content = content.replace(k, v)
-
-        return HTMLResponse(content)
 
     # Dev token generator endpoint
     async def dev_token_endpoint(request: Request) -> JSONResponse:
@@ -214,13 +191,19 @@ def get_api_routes(server: FastMCP, app_settings: Settings, startup_time: dateti
                     event_error=str(e),
                 )
             )
-            return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    # Recent telemetry events endpoint
+    async def recent_events_endpoint(request: Request) -> JSONResponse:
+        from livekit_mcp.utils.db_logger import get_recent_events
+        events = get_recent_events(limit=30)
+        return JSONResponse({"status": "success", "events": events})
 
     return [
         Route("/health", endpoint=health_endpoint, methods=["GET"]),
         Route("/", endpoint=root_endpoint, methods=["GET"]),
         Route("/api/tools/call", endpoint=call_tool_endpoint, methods=["POST"]),
         Route("/api/dev/token", endpoint=dev_token_endpoint, methods=["POST"]),
+        Route("/api/dev/recent-events", endpoint=recent_events_endpoint, methods=["GET"]),
         Route("/api/dev/check-db", endpoint=check_db_endpoint, methods=["GET"]),
         Route("/api/dev/check-lkt", endpoint=check_lkt_endpoint, methods=["GET"]),
     ]
+
