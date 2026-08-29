@@ -1,10 +1,14 @@
 # Current Sprint
 
-> **Sprint:** 0.1.0 Initial Setup & Doctor Availability  
-> **Last Updated:** 2026-08-25  
+> **Sprint:** 0.3.0 Production Dockerization & Org Processes Integration  
+> **Last Updated:** 2026-08-29  
 > **Status:** Active
 
-- [x] **Project Scaffolding (2026-08-20):** Structured project using Python 3.11+ and `uv`, configured `pyproject.toml` with build backend, dev dependencies, `ruff`, and `pytest`.
+- [x] **Production Multi-Stage Dockerfile (2026-08-29):** Created production Dockerfile using `ghcr.io/astral-sh/uv:python3.12-bookworm-slim`, unprivileged `appuser` (UID 10001), layer caching, runtime healthcheck, and direct binary CMD execution. Files: `Dockerfile`.
+- [x] **Organization Processes & Stages Tool (`fetch_org_processes`) (2026-08-27):** Implemented `fetch_org_processes` (and alias `receive_org_processes`) with 10-min in-memory TTL caching querying `MantraAssist-backend`. Files: `src/livekit_mcp/tools/org_processes.py`, `src/livekit_mcp/clients/backend_client.py`.
+- [x] **Doctor `provider_user_id` Injection (2026-08-27):** Added doctor user IDs into `receive_doctor_availability` output for automatic post-call appointment resolution. Files: `src/livekit_mcp/tools/doctor_availability.py`.
+- [x] **Unauthenticated Backend Client (2026-08-27):** Removed `x-client-id` and `x-client-secret` headers from `MantraAssistBackendClient`. Files: `src/livekit_mcp/clients/backend_client.py`.
+- [x] **JSON Root Status Endpoint (2026-08-27):** Replaced static landing page with lightweight JSON response. Files: `src/livekit_mcp/routes/api.py`.
 - [x] **Agentic Memory Infrastructure (2026-08-20):** Created `AGENTS.md` and full Obsidian knowledge vault (`obsidian/`) replicating the agentic memory pattern from `~/lkt`.
 - [x] **Shared JWT Authentication (2026-08-20):** Implemented HS256 JWT validation and pure ASGI middleware supporting header and query parameter token injection compatible with `mantra-auth`.
 - [x] **MCP Server Core & SSE Transport (2026-08-20):** Set up `MCPServer` with `/sse`, `/messages`, `/health`, and `/api/tools/call` endpoints.

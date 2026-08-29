@@ -1,0 +1,59 @@
+#GIT
+.git
+.gitignore
+
+#Pycache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+#Virtual environmen
+.venv/
+venv/
+env/
+ENV/
+
+#Test and Lint 
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+
+# Artifacts
+logs/
+build/
+dist/
+*.egg-info/
+
+
+#IDE related files
+.vscode/
+.idea/
+*.swp
+*.swo
+.antigravity/
+.cursor/
+.jetbrains/
+
+
+#Local dev files
+*.logs
+
+#Obsidian 
+.obsidian/
+.obsidian_vault/
+obsidian/.obsidian
+
+#Bytecode python
+**/*.pyc
+**/__pycache__
+**/*/__pycache__
+**/*.py[cod]
+
+

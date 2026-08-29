@@ -2,6 +2,22 @@
 
 All notable changes to the `livekit-mcp` project are documented in this file.
 
+## [0.3.0] - 2026-08-29
+
+### Added
+- **Production Multi-Stage Dockerfile**: Implemented a secure, optimized multi-stage build (`ghcr.io/astral-sh/uv:python3.12-bookworm-slim`) with unprivileged user `appuser` (UID 10001), layer-cached `uv sync --locked --no-dev`, container healthcheck (`/health`), and entrypoint `livekit-mcp`.
+
+## [0.2.5] - 2026-08-27
+
+### Added
+- **Organization Processes & Stages MCP Tool (`fetch_org_processes`)**: Added tool and alias (`receive_org_processes`) to query `MantraAssist-backend` (`GET /api/v1/processes?org_id={org_id}`) with structured process/stage IDs and 10-minute in-memory TTL caching.
+- **Provider User ID Injection**: Formatted provider availability strings with `(User ID: <id>)` for automated post-call scheduling resolution.
+
+### Changed
+- **Unauthenticated Backend Client**: Removed `x-client-id` and `x-client-secret` headers from `MantraAssistBackendClient`, communicating cleanly with backend services.
+- **Root Status API**: Replaced static HTML dashboard with lightweight JSON status response at `/` (`{"status": "working", "service": "livekit-mcp", ...}`).
+- **Database Connection Mapping**: Mapped `DATABASE_URL` and `MCP_EVENTS_DB_URL` to local PostgreSQL port 5442 (`mcp_logs_db`).
+
 ## [0.2.0] - 2026-08-25
 
 ### Added
