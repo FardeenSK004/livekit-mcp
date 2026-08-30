@@ -4,6 +4,7 @@
 > **Last Updated:** 2026-08-29  
 > **Status:** Active
 
+- [x] **Production Environment Config (2026-08-30):** Created dedicated production environment file `.env.prod` with `ENVIRONMENT=production`, secure JWT secret configuration, and production service URLs. Files: `.env.prod`.
 - [x] **Production Multi-Stage Dockerfile (2026-08-29):** Created production Dockerfile using `ghcr.io/astral-sh/uv:python3.12-bookworm-slim`, unprivileged `appuser` (UID 10001), layer caching, runtime healthcheck, and direct binary CMD execution. Files: `Dockerfile`.
 - [x] **Organization Processes & Stages Tool (`fetch_org_processes`) (2026-08-27):** Implemented `fetch_org_processes` (and alias `receive_org_processes`) with 10-min in-memory TTL caching querying `MantraAssist-backend`. Files: `src/livekit_mcp/tools/org_processes.py`, `src/livekit_mcp/clients/backend_client.py`.
 - [x] **Doctor `provider_user_id` Injection (2026-08-27):** Added doctor user IDs into `receive_doctor_availability` output for automatic post-call appointment resolution. Files: `src/livekit_mcp/tools/doctor_availability.py`.

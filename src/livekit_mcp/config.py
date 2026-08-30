@@ -23,8 +23,8 @@ class Settings(BaseSettings):
 
     # Authentication Settings (Mantra Auth OAuth 2.1 / Shared JWT)
     auth_enabled: bool = Field(default=True, validation_alias="AUTH_ENABLED")
-    jwt_secret: str = Field(
-        default="your-super-secret-jwt-key-change-in-production",
+    jwt_secret: str | None = Field(
+        default=None,
         validation_alias="JWT_SECRET",
     )
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")

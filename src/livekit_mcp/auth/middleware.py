@@ -85,7 +85,7 @@ class AuthMiddleware:
             await response(scope, receive, send)
             return
 
-        # Verify token
+        # Verify token via local JWT verification or remote OAuth introspection against Mantra Auth
         payload = verify_jwt_token(
             token=token,
             secret=self.settings.jwt_secret,
@@ -95,7 +95,13 @@ class AuthMiddleware:
         )
 
         if not payload:
-            logger.warning("Unauthorized request to %s: Invalid or expired token", path)
+            from livekit_mcp.clients.auth_client import AuthClient
+
+            auth_client = AuthClient(self.settings)
+            payload = await auth_client.introspect_token(token)
+
+        if not payload:
+            logger.warning("Unauthorized request to %s: Invalid token or rejected by Auth Server", path)
             response = JSONResponse(
                 status_code=401,
                 content={
