@@ -4,7 +4,8 @@ ARG PYTHON_VERSION=3.12
 FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_PYTHON=/usr/local/bin/python3.12
 WORKDIR /app
 
 # --- Build stage ---
@@ -18,11 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install dependencies with locked uv state
 COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --no-install-project --no-dev
+RUN uv sync --locked --no-install-project --no-dev --python /usr/local/bin/python3.12
 
 # Copy source code and install project wheel
 COPY . .
-RUN uv sync --locked --no-dev
+RUN uv sync --locked --no-dev --python /usr/local/bin/python3.12
 
 # --- Production stage ---
 FROM base AS production

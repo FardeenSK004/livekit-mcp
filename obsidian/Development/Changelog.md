@@ -2,6 +2,13 @@
 
 All notable changes to the `livekit-mcp` project are documented in this file.
 
+## [0.3.2] - 2026-09-01
+
+### Fixed
+
+- **Production Dockerfile Python Interpreter Binding**: Fixed `exec /app/.venv/bin/livekit-mcp: no such file or directory` error caused by `apt-get install python3-dev` creating a virtual environment bound to `/usr/bin/python3.11` instead of the base image's `/usr/local/bin/python3.12`. Configured `UV_PYTHON=/usr/local/bin/python3.12` and `--python /usr/local/bin/python3.12` flags in `Dockerfile`.
+- **Docker Compose Environment & Database Mapping**: Added root `docker-compose.yml` with `env_file: .env`, mapping `AUTH_SERVER_URL=${AUTH_SERVER_URL}`, correcting `DATABASE_URL` format to `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-mcp:5432/${POSTGRES_DB}`, and stripping invalid quotes.
+
 ## [0.3.1] - 2026-08-30
 
 ### Added
