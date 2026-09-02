@@ -1,94 +1,96 @@
 """Server factory and application builder for LiveKit MCP Server."""
 
+import json
 import logging
+import os
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, Response
+from starlette.routing import Mount, Route
 
 from livekit_mcp.auth.middleware import AuthMiddleware
 from livekit_mcp.config import Settings, get_settings
-from livekit_mcp.tools.greeting import register_greeting_tool
+from livekit_mcp.tools.doctor_availability import register_doctor_availability_tool
+from livekit_mcp.tools.org_processes import register_org_processes_tool
+from livekit_mcp.tools.providers import register_provider_tools
+from livekit_mcp.utils.db_logger import save_mcp_event
+
+_proc_type = "MCP Server"
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(
+    logging.Formatter(
+        f"%(asctime)s INFO (Type: {_proc_type}, PID: {os.getpid()}) %(name)s: %(message)s"
+    )
+)
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 
 logger = logging.getLogger(__name__)
 
+# Track server startup time for dashboard uptime display
+STARTUP_TIME = datetime.now(UTC)
 
-def create_mcp_server(settings: Settings | None = None) -> MCPServer:
-    """Create and configure the underlying MCP server instance."""
-    server = MCPServer(
+
+from livekit_mcp.routes.api import get_api_routes
+
+def create_mcp_server(settings: Settings | None = None) -> FastMCP:
+    """Create and configure the underlying FastMCP server instance."""
+    app_settings = settings or get_settings()
+
+    server = FastMCP(
         name="livekit-mcp",
-        version="0.1.0",
         instructions=(
             "LiveKit MCP Server provides tools to interact with the MantraCare "
-            "voice agent engine, telephony trunks, call logs, and knowledge base."
+            "voice agent engine, telephony trunks, call logs, knowledge base, "
+            "organization processes & stages, and healthcare provider availability schedules."
         ),
     )
 
-    # Register initial tools
-    register_greeting_tool(server)
+    # Register tools
+    register_org_processes_tool(server, settings=app_settings)
+    register_provider_tools(server, settings=app_settings)
+    register_doctor_availability_tool(server, settings=app_settings)
 
     return server
 
 
 def create_app(settings: Settings | None = None) -> Starlette:
-    """Create the full Starlette application with SSE transport and auth middleware."""
+    """Create the full Starlette application with official SSE transport and auth middleware."""
     app_settings = settings or get_settings()
     server = create_mcp_server(app_settings)
 
-    # Configure transport security allowing local, test, and configured hosts
-    transport_security = TransportSecuritySettings(
-        enable_dns_rebinding_protection=app_settings.is_production,
-        allowed_hosts=[
-            "127.0.0.1:*",
-            "localhost:*",
-            "[::1]:*",
-            "testserver",
-            "testserver:*",
-            f"{app_settings.host}:*",
-        ],
-        allowed_origins=[
-            "http://127.0.0.1:*",
-            "http://localhost:*",
-            "http://[::1]:*",
-            "http://testserver",
-            "http://testserver:*",
-        ],
-    )
+    sse = SseServerTransport("/messages/")
 
-    # Build base MCP Starlette application with transport security
-    app = server.sse_app(transport_security=transport_security)
-
-    # Health check route
-    async def health_endpoint(request: Request) -> JSONResponse:
-        return JSONResponse(
-            {
-                "status": "healthy",
-                "service": "livekit-mcp",
-                "version": "0.1.0",
-                "auth_enabled": app_settings.auth_enabled,
-                "environment": app_settings.environment,
-                "lkt_api_configured": bool(app_settings.lkt_api_base_url),
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
+    async def handle_sse(request: Request) -> Response:
+        import asyncio
+        asyncio.create_task(
+            save_mcp_event(
+                event_type="sse_connected",
+                event_source="handle_sse",
+                event_payload={"client": request.client.host if request.client else "unknown"}
+            )
         )
+        async with sse.connect_sse(request.scope, request.receive, request._send) as (read_stream, write_stream):
+            await server._mcp_server.run(
+                read_stream,
+                write_stream,
+                server._mcp_server.create_initialization_options(),
+            )
+        return Response()
 
-    # Root status endpoint
-    async def root_endpoint(request: Request) -> JSONResponse:
-        return JSONResponse(
-            {
-                "message": "LiveKit MCP Server is running",
-                "docs": "/health",
-                "sse_endpoint": "/sse",
-                "messages_endpoint": "/messages",
-            }
-        )
+    api_routes = get_api_routes(server, app_settings, STARTUP_TIME)
 
-    # Add custom routes
-    app.add_route("/health", health_endpoint, methods=["GET"])
-    app.add_route("/", root_endpoint, methods=["GET"])
+    routes = [
+        Route("/sse", endpoint=handle_sse),
+        Mount("/messages", app=sse.handle_post_message),
+    ] + api_routes
+
+    app = Starlette(routes=routes)
 
     # Add AuthMiddleware
     app.add_middleware(AuthMiddleware, settings=app_settings)

@@ -1,56 +1,63 @@
-"""Async HTTP client for interacting with the Mantra Auth OAuth 2.1 server."""
+"""Mantra Auth OAuth Introspection Client."""
 
 import logging
-from typing import Any
+from typing import Any, Dict, Optional
 
 import httpx
 
-from livekit_mcp.config import Settings
+from livekit_mcp.auth.jwt import JWTPayload
+from livekit_mcp.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
 
 class AuthClient:
-    """Client for Mantra Auth OAuth2.1 server (:3000)."""
+    """Async client for Mantra Auth OAuth 2.1 token introspection."""
 
-    def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None):
-        self.settings = settings
-        self.base_url = settings.auth_server_url.rstrip("/")
-        self._client = client
+    def __init__(self, settings: Optional[Settings] = None):
+        self.settings = settings or get_settings()
+        self.auth_server_url = self.settings.auth_server_url.rstrip("/")
 
-    async def introspect_token(self, token: str) -> dict[str, Any]:
-        """Introspect an access token against mantra-auth."""
-        url = f"{self.base_url}/api/oauth/introspect"
-        data = {"token": token, "token_type_hint": "access_token"}
+    async def introspect_token(self, token: str) -> Optional[JWTPayload]:
+        """Introspect access token via Mantra Auth POST /api/oauth/introspect.
 
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.post(
-                    url,
-                    data=data,
-                    headers={"Content-Type": "application/x-www-form-urlencoded"},
-                )
-                if response.status_code == 200:
-                    return response.json()
-                logger.warning(
-                    "Token introspection returned %d: %s", response.status_code, response.text
-                )
-                return {"active": False, "error": response.text}
-        except Exception as e:
-            logger.error("Token introspection request failed: %s", str(e))
-            return {"active": False, "error": str(e)}
+        Args:
+            token: Raw access token or bearer token string.
 
-    async def get_user_info(self, token: str) -> dict[str, Any]:
-        """Fetch userinfo from mantra-auth."""
-        url = f"{self.base_url}/api/oauth/userinfo"
-        headers = {"Authorization": f"Bearer {token}"}
+        Returns:
+            JWTPayload if active, None if inactive or verification failed.
+        """
+        introspect_url = f"{self.auth_server_url}/api/oauth/introspect"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        payload = {
+            "token": token,
+            "token_type_hint": "access_token",
+        }
 
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(url, headers=headers)
+                response = await client.post(introspect_url, data=payload, headers=headers)
                 if response.status_code == 200:
-                    return response.json()
-                return {"error": response.text, "status_code": response.status_code}
+                    data: Dict[str, Any] = response.json()
+                    if data.get("active") is True:
+                        logger.info("OAuth introspection succeeded for sub=%s", data.get("sub"))
+                        return JWTPayload(
+                            sub=str(data.get("sub", data.get("username", "agent"))),
+                            aud=data.get("client_id"),
+                            iss=self.auth_server_url,
+                            scope=data.get("scope", "mcp:all"),
+                            token_type=data.get("token_type", "access_token"),
+                        )
+                    else:
+                        logger.warning("OAuth introspection rejected token: active=false")
+                        return None
+                else:
+                    logger.warning(
+                        "OAuth introspection failed with HTTP %d: %s",
+                        response.status_code,
+                        response.text[:200],
+                    )
+                    return None
         except Exception as e:
-            logger.error("Userinfo request failed: %s", str(e))
-            return {"error": str(e)}
+            logger.error("Error connecting to Mantra Auth introspection endpoint: %s", e)
+            return None

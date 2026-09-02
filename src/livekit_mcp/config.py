@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,8 +23,8 @@ class Settings(BaseSettings):
 
     # Authentication Settings (Mantra Auth OAuth 2.1 / Shared JWT)
     auth_enabled: bool = Field(default=True, validation_alias="AUTH_ENABLED")
-    jwt_secret: str = Field(
-        default="your-super-secret-jwt-key-change-in-production",
+    jwt_secret: str | None = Field(
+        default=None,
         validation_alias="JWT_SECRET",
     )
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
@@ -32,8 +32,36 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         validation_alias="AUTH_SERVER_URL",
     )
-    jwt_issuer: str | None = Field(default=None, validation_alias="JWT_ISSUER")
+    jwt_issuer: str | None = Field(default=None, validation_alias=AliasChoices("JWT_ISSUER", "MCP_ISSUER_URL"))
     jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")
+
+    # MantraAssist Backend HTTP API Endpoint (:5500)
+    mantraassist_backend_url: str = Field(
+        default="http://localhost:5500",
+        validation_alias="MANTRAASSIST_BACKEND_URL",
+    )
+    mantraassist_client_id: str | None = Field(
+        default=None,
+        validation_alias="MANTRAASSIST_CLIENT_ID",
+    )
+    mantraassist_client_secret: str | None = Field(
+        default=None,
+        validation_alias="MANTRAASSIST_CLIENT_SECRET",
+    )
+
+    # PostgreSQL Database (mcp_logs_db / assist_db)
+    database_url: str = Field(
+        default="postgresql://postgres:password@localhost:5442/mcp_logs_db",
+        validation_alias="DATABASE_URL",
+    )
+    assist_db_url: str | None = Field(
+        default=None,
+        validation_alias="ASSIST_DB_URL",
+    )
+    mcp_events_db_url: str | None = Field(
+        default=None,
+        validation_alias="MCP_EVENTS_DB_URL",
+    )
 
     # LKT Voice Agent & Telephony Service
     lkt_api_base_url: str = Field(
@@ -46,6 +74,12 @@ class Settings(BaseSettings):
     livekit_url: str | None = Field(default=None, validation_alias="LIVEKIT_URL")
     livekit_api_key: str | None = Field(default=None, validation_alias="LIVEKIT_API_KEY")
     livekit_api_secret: str | None = Field(default=None, validation_alias="LIVEKIT_API_SECRET")
+
+    @property
+    def effective_db_url(self) -> str:
+        """Return the effective database URL (MCP_EVENTS_DB_URL, ASSIST_DB_URL, or DATABASE_URL)."""
+        return self.mcp_events_db_url or self.assist_db_url or self.database_url
+
 
     @property
     def is_production(self) -> bool:
