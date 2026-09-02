@@ -18,6 +18,8 @@ DEFAULT_PUBLIC_PATHS: set[str] = {
     "/docs",
     "/openapi.json",
     "/favicon.ico",
+    "/robots.txt",
+    "/sitemap.xml",
     "/api/dev/token",
     "/api/dev/check-db",
     "/api/dev/check-lkt",
