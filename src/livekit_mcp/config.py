@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         validation_alias="AUTH_SERVER_URL",
     )
-    jwt_issuer: str | None = Field(default=None, validation_alias="JWT_ISSUER")
+    jwt_issuer: str | None = Field(default=None, validation_alias=AliasChoices("JWT_ISSUER", "MCP_ISSUER_URL"))
     jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")
 
     # MantraAssist Backend HTTP API Endpoint (:5500)
