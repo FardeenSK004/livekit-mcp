@@ -29,8 +29,11 @@ ENV/
 
 # Environment Variables
 .env
+.env/*
+*.env
 .env.local
 .env.*.local
+.env.prod
 
 # Testing & Linting
 .pytest_cache/
