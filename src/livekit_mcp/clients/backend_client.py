@@ -18,6 +18,45 @@ class MantraAssistBackendClient:
         self.settings = settings or get_settings()
         self.base_url = self.settings.mantraassist_backend_url.rstrip("/")
 
+    async def recognize_client(
+        self,
+        org_id: int | str,
+        phone_number: str,
+        timeout: float = 3.0,
+    ) -> dict[str, Any] | None:
+        """Resolve an inbound caller name through the MA client recognition endpoint.
+
+        Contract: POST /api/v1/webhooks/client-recognition with org_id and phone_number.
+        Expected response: {"client_name": "..."} or {"client_name": null}.
+        """
+        url = f"{self.base_url}/api/v1/webhooks/client-recognition"
+        payload = {
+            "org_id": str(org_id),
+            "phone_number": str(phone_number).strip(),
+        }
+        headers = {"ngrok-skip-browser-warning": "69420"}
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                if response.status_code != 200:
+                    logger.warning(
+                        "Client recognition backend returned HTTP %d: %s",
+                        response.status_code,
+                        response.text[:200],
+                    )
+                    return None
+
+                data = response.json()
+                if not isinstance(data, dict):
+                    return None
+                if isinstance(data.get("data"), dict):
+                    data = data["data"]
+                return {"client_name": data.get("client_name")}
+        except Exception as error:
+            logger.warning("Client recognition backend request failed: %s", error)
+            return None
+
     async def get_doctor_availability(
         self,
         org_id: int | str | None = None,
