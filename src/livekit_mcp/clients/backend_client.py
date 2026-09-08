@@ -22,15 +22,14 @@ class MantraAssistBackendClient:
         self,
         org_id: int | str,
         phone_number: str,
-        timeout: float = 3.0,
+        timeout: float = 5.0,
     ) -> dict[str, Any] | None:
-        """Resolve an inbound caller name through the MA client recognition endpoint.
+        """Fetch an inbound caller lead through the MA MCP webhook endpoint.
 
-        Contract: POST /api/v1/webhooks/client-recognition with org_id and phone_number.
-        Expected response: {"client_name": "..."} or {"client_name": null}.
+        Contract: GET /v1/webhooks/mcp/lead?org_id={org_id}&phone={phone_number}.
         """
-        url = f"{self.base_url}/api/v1/webhooks/client-recognition"
-        payload = {
+        url = f"{self.base_url}/v1/webhooks/mcp/lead"
+        params = {
             "org_id": str(org_id),
             "phone_number": str(phone_number).strip(),
         }
@@ -38,7 +37,13 @@ class MantraAssistBackendClient:
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(url, json=payload, headers=headers)
+                logger.info("[MA-BACKEND] Recognizing client: GET %s | Params: %s", url, params)
+                response = await client.get(url, params=params, headers=headers)
+                logger.info(
+                    "[MA-BACKEND] Client recognition response HTTP %d: %s",
+                    response.status_code,
+                    response.text[:1000],
+                )
                 if response.status_code != 200:
                     logger.warning(
                         "Client recognition backend returned HTTP %d: %s",
@@ -49,10 +54,8 @@ class MantraAssistBackendClient:
 
                 data = response.json()
                 if not isinstance(data, dict):
-                    return None
-                if isinstance(data.get("data"), dict):
-                    data = data["data"]
-                return {"client_name": data.get("client_name")}
+                    return {"data": data}
+                return data
         except Exception as error:
             logger.warning("Client recognition backend request failed: %s", error)
             return None
@@ -77,12 +80,12 @@ class MantraAssistBackendClient:
             - department: Department / Specialization (or "" if missing)
             - caller_phone: Caller phone number (if available)
 
-        Calls: POST /api/v1/webhooks/mcp (or GET /api/v1/webhooks/mcp)
+        Calls: POST /v1/webhooks/mcp (or GET /v1/webhooks/mcp)
 
         Returns:
             List of provider objects with UTC time slots, or None if request fails.
         """
-        url = f"{self.base_url}/api/v1/webhooks/mcp"
+        url = f"{self.base_url}/v1/webhooks/mcp"
 
         org_id_val = org_id if org_id is not None else ""
         doc_name_val = str(doctor_name).strip() if doctor_name and str(doctor_name).strip() else ""
@@ -166,9 +169,9 @@ class MantraAssistBackendClient:
                 return cached_data
 
         urls = [
-            f"{self.base_url}/api/v1/webhooks/mcp/processes",
-            f"{self.base_url}/api/v1/processes",
-            f"{self.base_url}/api/v1/webhooks/mcp",
+            f"{self.base_url}/v1/webhooks/mcp/processes",
+            f"{self.base_url}/v1/processes",
+            f"{self.base_url}/v1/webhooks/mcp",
         ]
 
         headers: dict[str, str] = {

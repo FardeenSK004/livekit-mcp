@@ -74,7 +74,7 @@
   - `org_id` (integer|string, required): Organization ID (e.g. `77`).
 
 ### `recognize_client`
-- **Description:** Identifies an inbound caller by organization and phone number before greeting. Normalizes the number to E.164 style (bare 10-digit numbers assumed `+91`), calls `POST /api/v1/webhooks/client-recognition` with a 3s timeout, and fails open (`{"client_name": null}`) on timeout/non-200/backend failure.
+- **Description:** Identifies an inbound caller by organization and phone number before greeting. Normalizes the number to E.164 style (bare 10-digit numbers assumed `+91`), calls `GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}` with a 5s timeout, and fails open (`{"client_name": null}`) on timeout/non-200/backend failure.
 - **Arguments:**
   - `org_id` (integer|string, required): Organization ID for the inbound number.
   - `phone_number` (string, required): Inbound caller number, preferably E.164.

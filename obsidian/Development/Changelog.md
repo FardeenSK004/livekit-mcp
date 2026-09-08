@@ -4,6 +4,11 @@ All notable changes to the `livekit-mcp` project are documented in this file.
 
 ## [Unreleased] — vault sync 2026-09-08
 
+### Client Recognition Response Mapping
+
+- **fix:** The MCP tool maps lead responses such as `{"name":"SK"}` to `{"client_name":"SK"}` and preserves null results.
+- **fix:** The lead lookup uses the `phone` query parameter.
+
 ### Fixed (docs only, no code changes)
 
 - Added missing `Features/Client Recognition Tool.md` and `Features/Org Processes Tool.md`.
@@ -14,7 +19,7 @@ All notable changes to the `livekit-mcp` project are documented in this file.
 
 ### Added
 
-- **Inbound Client Recognition Tool (`recognize_client`)**: Added an MCP tool that normalizes an inbound phone number, sends `org_id` and the E.164-style number to `POST /api/v1/webhooks/client-recognition`, and returns `client_name` or `null` for anonymous callers.
+- **Inbound Client Recognition Tool (`recognize_client`)**: Added an MCP tool that normalizes an inbound phone number, sends `org_id` and the E.164-style number to `GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}`, and returns lead data or `null` for anonymous callers.
 - **Bounded Backend Lookup**: Client recognition uses a three-second backend timeout and fails open so inbound calls are not blocked when the backend is unavailable.
 
 ## [0.3.2] - 2026-09-01

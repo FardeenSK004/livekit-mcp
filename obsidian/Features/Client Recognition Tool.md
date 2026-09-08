@@ -5,7 +5,7 @@ The `recognize_client` tool identifies an inbound caller by organization and pho
 
 ## Flow
 1. Normalize the caller number via `normalize_phone_number()` (E.164 style; bare 10-digit numbers assumed Indian `+91`).
-2. `MantraAssistBackendClient.recognize_client()` POSTs `{org_id, phone_number}` to `POST /api/v1/webhooks/client-recognition` (3s timeout, `ngrok-skip-browser-warning` header).
+2. `MantraAssistBackendClient.recognize_client()` sends `GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}` (5s timeout, `ngrok-skip-browser-warning` header).
 3. Unwrap `{"client_name"}` (tolerates `{data: {client_name}}` envelope); non-200 / exception → `None`.
 4. Tool returns `{"client_name": "<name>" | null}` as a JSON string.
 

@@ -15,7 +15,7 @@
 
 ## Completed
 
-- [x] **Inbound Client Recognition MCP Tool (2026-09-07):** Added `recognize_client` to normalize the inbound caller number and query the MA backend with `org_id` plus phone number. The livekit agent calls this tool before greeting and treats `null`, timeout, or backend failure as an anonymous caller. Backend endpoint contract: `POST /api/v1/webhooks/client-recognition`.
+- [x] **Inbound Client Recognition MCP Tool (2026-09-07):** Added `recognize_client` to normalize the inbound caller number and query the MA backend with `org_id` plus phone number. The livekit agent calls this tool before greeting and treats `null`, timeout, or backend failure as an anonymous caller. Backend endpoint contract: `GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}`.
 
 - [x] **Production Docker Build & Exec Fix (2026-09-01):** Resolved `exec /app/.venv/bin/livekit-mcp: no such file or directory` by enforcing `UV_PYTHON=/usr/local/bin/python3.12` in `Dockerfile`. Added `docker-compose.yml` with `env_file: .env` and fixed `DATABASE_URL` format.
 - [x] **Production Environment Config (2026-08-30):** Created dedicated production environment file `.env.prod` with `ENVIRONMENT=production`, secure JWT secret configuration, and production service URLs. Files: `.env.prod`.

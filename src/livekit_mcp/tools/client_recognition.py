@@ -56,4 +56,12 @@ def register_client_recognition_tool(
             org_id=org_id,
             phone_number=normalized_phone,
         )
-        return json.dumps({"client_name": result.get("client_name") if result else None})
+        client_name = None
+        if isinstance(result, dict):
+            response_data = result.get("data") if isinstance(result.get("data"), dict) else result
+            client_name = (
+                response_data.get("client_name")
+                or response_data.get("name")
+                or response_data.get("full_name")
+            )
+        return json.dumps({"client_name": client_name})

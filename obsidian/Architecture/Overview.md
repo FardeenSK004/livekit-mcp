@@ -47,7 +47,7 @@ Modular, asynchronous, service-oriented architecture using Python `asyncio`, `St
 │ MantraAssist-backend (HTTP API on :5500)                     │
 │  ├── POST /api/v1/webhooks/mcp (availability, GET+POST)      │
 │  ├── GET  /api/v1/processes (org processes, + fallbacks)     │
-│  └── POST /api/v1/webhooks/client-recognition                │
+│  └── GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}    │
 └──────────────────────────────┬───────────────────────────────┘
                                │ Async HTTP (REST)
                                ▼
