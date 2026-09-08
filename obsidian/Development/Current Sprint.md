@@ -1,8 +1,19 @@
 # Current Sprint
 
 > **Sprint:** 0.3.0 Production Dockerization & Org Processes Integration  
-> **Last Updated:** 2026-08-29  
+> **Last Updated:** 2026-09-08  
 > **Status:** Active
+> **HEAD:** `993b674` (Client recognition added, 2026-09-07)
+
+## Repo-State Sync (2026-09-08, no code changes)
+- [x] **Vault resync:** Added `Features/Client Recognition Tool.md` + `Features/Org Processes Tool.md`; refreshed `Home.md`, `Architecture/*`, `Context/Repository Map.md`, `Context/Stack.md`, `Knowledge/Conventions.md` to match the working tree.
+- [ ] **Gap: `docker-compose.yml` missing** — sprint/Changelog 0.3.2 reference it, but it is not tracked in git nor on disk. Re-add or correct history.
+- [ ] **Gap: `tests/` suite missing** — earlier docs claim 27 passing tests; no `tests/` dir exists (only `.pytest_cache`). Re-scaffold suite.
+- [ ] **Gap: `tools/__init__.py` export** — `register_client_recognition_tool` is wired in `server.py` but not re-exported. Add to `__all__`.
+- [ ] **Gap: version drift** — `pyproject.toml` is `0.1.0`, Changelog tracks `0.3.3`. Bump to `0.3.3`.
+- [ ] **Stale: `Greeting Tool.md`** — describes `greet_user`, but no `greeting.py` module exists in `tools/`. Confirm removal or restore.
+
+## Completed
 
 - [x] **Inbound Client Recognition MCP Tool (2026-09-07):** Added `recognize_client` to normalize the inbound caller number and query the MA backend with `org_id` plus phone number. The livekit agent calls this tool before greeting and treats `null`, timeout, or backend failure as an anonymous caller. Backend endpoint contract: `POST /api/v1/webhooks/client-recognition`.
 

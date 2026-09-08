@@ -1,5 +1,14 @@
 # Development TODO
 
+> **Last Updated:** 2026-09-08
+
+## Immediate Gaps (from repo-state sync)
+- [ ] Re-add missing `docker-compose.yml` (or correct sprint/Changelog 0.3.2 history)
+- [ ] Re-scaffold `tests/` suite (27-test baseline claimed, dir absent)
+- [ ] Export `register_client_recognition_tool` from `tools/__init__.py`
+- [ ] Bump `pyproject.toml` version `0.1.0` → `0.3.3`
+- [ ] Resolve `greet_user` / `Greeting Tool.md` vs missing `tools/greeting.py`
+
 ## Planned Enhancements
 
 ### Phase 2: Telephony & Call Tools

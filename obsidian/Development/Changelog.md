@@ -2,6 +2,14 @@
 
 All notable changes to the `livekit-mcp` project are documented in this file.
 
+## [Unreleased] — vault sync 2026-09-08
+
+### Fixed (docs only, no code changes)
+
+- Added missing `Features/Client Recognition Tool.md` and `Features/Org Processes Tool.md`.
+- Refreshed `Home.md`, `Architecture/Overview.md`, `Architecture/APIs.md`, `Architecture/Security & Auth.md`, `Context/Repository Map.md`, `Context/Stack.md`, `Knowledge/Conventions.md` to match the working tree at `993b674`.
+- Recorded known drift: missing `docker-compose.yml`, missing `tests/` suite, `tools/__init__.py` export gap, `pyproject.toml` version drift (`0.1.0` vs `0.3.3`), stale `Greeting Tool.md`.
+
 ## [0.3.3] - 2026-09-07
 
 ### Added

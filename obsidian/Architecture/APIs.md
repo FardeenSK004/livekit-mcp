@@ -24,6 +24,20 @@
 - **Auth:** Bearer token in header or `?token=<jwt>`
 - **Description:** JSON-RPC 2.0 endpoint for MCP commands (tool listing, tool execution, prompts, resources).
 
+### 4. `GET /` (Root Status)
+- **Auth:** None (Public)
+- **Description:** Lightweight JSON status response (`{"status": "working", "service": "livekit-mcp", ...}`).
+
+### 5. `POST /api/tools/call`
+- **Auth:** Bearer token required
+- **Description:** Direct synchronous tool invocation for internal microservices (e.g. `lkt`). Body: `{"name": "<tool>", "arguments": {...}}`. Handles both FastMCP `CallToolResult` and raw list responses; logs start/complete/fail telemetry via `db_logger`.
+
+### 6. Dev & Diagnostics (public, token generator disabled in production)
+- `POST /api/dev/token` — signs local HS256 test JWTs (`user`, `client`, `scope`, `hours`); returns `403` in production.
+- `GET /api/dev/check-db` — verifies PostgreSQL connectivity (`SELECT 1`).
+- `GET /api/dev/check-lkt` — pings the LKT voice engine base URL.
+- `GET /api/dev/recent-events` — returns last 30 telemetry events from `db_logger`.
+
 ---
 
 ## Registered MCP Tools
@@ -53,3 +67,14 @@
   - `booked_slots` (array of strings, optional): Already booked slots.
   - `slot_interval_minutes` (integer, optional, default: 60): Duration in minutes.
   - `notes` (string, optional): Special clinical notes.
+
+### `fetch_org_processes` (+ alias `receive_org_processes`)
+- **Description:** Queries `MantraAssist-backend` for all processes and stage IDs with descriptions for an organization; used during post-call analysis to assign `process_id` / `new_stage_id`. 10-minute in-memory TTL cache per `org_id`, with fallback endpoint chain.
+- **Arguments:**
+  - `org_id` (integer|string, required): Organization ID (e.g. `77`).
+
+### `recognize_client`
+- **Description:** Identifies an inbound caller by organization and phone number before greeting. Normalizes the number to E.164 style (bare 10-digit numbers assumed `+91`), calls `POST /api/v1/webhooks/client-recognition` with a 3s timeout, and fails open (`{"client_name": null}`) on timeout/non-200/backend failure.
+- **Arguments:**
+  - `org_id` (integer|string, required): Organization ID for the inbound number.
+  - `phone_number` (string, required): Inbound caller number, preferably E.164.
