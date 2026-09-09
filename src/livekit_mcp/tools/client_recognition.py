@@ -38,14 +38,15 @@ def register_client_recognition_tool(
         name="recognize_client",
         description=(
             "Identify an inbound caller by organization and phone number before the greeting. "
-            "Returns a client name when registered, otherwise null."
+            "Returns the client name, recent AI summaries, and custom fields when registered. "
+            "Returns null client_name and empty metadata when no client is found."
         ),
     )
     async def recognize_client(
         org_id: Annotated[int | str, "Organization ID associated with the inbound phone number"],
         phone_number: Annotated[str, "Inbound caller phone number, preferably in E.164 format"],
     ) -> str:
-        """Return the registered client name or a null name for anonymous callers."""
+        """Return the registered client identity and metadata for anonymous-call context."""
         normalized_phone = normalize_phone_number(phone_number)
         logger.info(
             "[MCP-TOOL] recognize_client called for org_id=%s, phone=%s",
@@ -56,12 +57,31 @@ def register_client_recognition_tool(
             org_id=org_id,
             phone_number=normalized_phone,
         )
+        response_data = result if isinstance(result, dict) else {}
+        if isinstance(response_data.get("data"), dict):
+            response_data = response_data["data"]
+        elif isinstance(response_data.get("result"), dict):
+            response_data = response_data["result"]
+
         client_name = None
-        if isinstance(result, dict):
-            response_data = result.get("data") if isinstance(result.get("data"), dict) else result
+        client_metadata = {
+            "ai_summaries": [],
+            "custom_fields": [],
+        }
+        if isinstance(response_data, dict):
             client_name = (
                 response_data.get("client_name")
                 or response_data.get("name")
                 or response_data.get("full_name")
             )
-        return json.dumps({"client_name": client_name})
+            raw_metadata = response_data.get("client_metadata")
+            if isinstance(raw_metadata, dict):
+                if isinstance(raw_metadata.get("ai_summaries"), list):
+                    client_metadata["ai_summaries"] = raw_metadata["ai_summaries"]
+                if isinstance(raw_metadata.get("custom_fields"), list):
+                    client_metadata["custom_fields"] = raw_metadata["custom_fields"]
+
+        return json.dumps({
+            "client_name": client_name,
+            "client_metadata": client_metadata,
+        })
