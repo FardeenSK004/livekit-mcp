@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 import httpx
+from pydantic import v1
 
 from livekit_mcp.config import Settings, get_settings
 from livekit_mcp.utils.timezone import resolve_date_string, to_utc_iso_string
@@ -38,12 +39,12 @@ class MantraAssistBackendClient:
             - department: Department / Specialization (or "" if missing)
             - caller_phone: Caller phone number (if available)
 
-        Calls: POST /api/v1/webhooks/mcp (or GET /api/v1/webhooks/mcp)
+        Calls: POST /v1/webhooks/mcp (or GET /v1/webhooks/mcp)
 
         Returns:
             List of provider objects with UTC time slots, or None if request fails.
         """
-        url = f"{self.base_url}/api/v1/webhooks/mcp"
+        url = f"{self.base_url}/v1/webhooks/mcp"
 
         org_id_val = org_id if org_id is not None else ""
         doc_name_val = str(doctor_name).strip() if doctor_name and str(doctor_name).strip() else ""
@@ -112,7 +113,7 @@ class MantraAssistBackendClient:
         """Fetch processes and stages with descriptions for an organization.
 
         Uses an in-memory TTL cache to avoid repeated network overhead.
-        Calls: GET /api/v1/processes?org_id={org_id} (with fallback endpoints)
+        Calls: GET /v1/processes?org_id={org_id} (with fallback endpoints)
         """
         import time
 
@@ -127,9 +128,9 @@ class MantraAssistBackendClient:
                 return cached_data
 
         urls = [
-            f"{self.base_url}/api/v1/webhooks/mcp/processes",
-            f"{self.base_url}/api/v1/processes",
-            f"{self.base_url}/api/v1/webhooks/mcp",
+            f"{self.base_url}/v1/webhooks/mcp/processes",
+            f"{self.base_url}/v1/processes",
+            f"{self.base_url}/v1/webhooks/mcp",
         ]
 
         headers: dict[str, str] = {

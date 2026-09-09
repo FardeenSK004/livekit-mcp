@@ -66,7 +66,7 @@ class LktClient:
         try:
             async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout) as client:
                 response = await client.post(
-                    "/api/v1/webhooks/telephony", json=payload, headers=headers
+                    "/v1/webhooks/telephony", json=payload, headers=headers
                 )
                 response.raise_for_status()
                 return response.json()
