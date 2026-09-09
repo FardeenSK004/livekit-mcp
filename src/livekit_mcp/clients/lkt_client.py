@@ -48,7 +48,7 @@ class LktClient:
 
         try:
             async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout) as client:
-                response = await client.get("/api/v1/dashboard/active-calls", headers=headers)
+                response = await client.get("/v1/dashboard/active-calls", headers=headers)
                 response.raise_for_status()
                 return response.json()
         except Exception as e:

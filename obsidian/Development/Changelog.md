@@ -2,6 +2,13 @@
 
 All notable changes to the `livekit-mcp` project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Organization Department Discovery (`get_org_departments`)**: Added a cached MCP tool that fetches organization-specific medical departments/specialties from MantraAssist-backend for broad-symptom clarification before doctor availability lookup.
+- **Department Payload Contract**: Normalized the MantraAssist response as `{"org_id": <id>, "departments": [<names>]}` and preserved `org_id` through the MCP tool and cache.
+
 ## [0.3.2] - 2026-09-01
 
 ### Fixed

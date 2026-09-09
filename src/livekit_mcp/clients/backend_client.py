@@ -38,12 +38,12 @@ class MantraAssistBackendClient:
             - department: Department / Specialization (or "" if missing)
             - caller_phone: Caller phone number (if available)
 
-        Calls: POST /api/v1/webhooks/mcp (or GET /api/v1/webhooks/mcp)
+        Calls: POST /v1/webhooks/mcp (or GET /v1/webhooks/mcp)
 
         Returns:
             List of provider objects with UTC time slots, or None if request fails.
         """
-        url = f"{self.base_url}/api/v1/webhooks/mcp"
+        url = f"{self.base_url}/v1/webhooks/mcp"
 
         org_id_val = org_id if org_id is not None else ""
         doc_name_val = str(doctor_name).strip() if doctor_name and str(doctor_name).strip() else ""
@@ -102,6 +102,73 @@ class MantraAssistBackendClient:
 
     # In-memory temporary cache: org_id -> (timestamp, data)
     _processes_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+    _departments_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+    async def get_org_departments(
+        self,
+        org_id: int | str,
+        timeout: float = 5.0,
+        ttl_seconds: float = 600.0,
+    ) -> dict[str, Any]:
+        """Fetch the backend department payload for an organization.
+
+        Expected backend response shape::
+
+            {"org_id": 77, "departments": ["retina", "cataract", "lasik"]}
+
+        Calls: GET /v1/webhooks/mcp/departments?org_id={org_id}
+        """
+        org_id_str = str(org_id).strip()
+        now = time.time()
+
+        cached = self._departments_cache.get(org_id_str)
+        if cached and now - cached[0] < ttl_seconds:
+            return cached[1]
+
+        url = f"{self.base_url}/v1/webhooks/mcp/departments"
+        headers = {"ngrok-skip-browser-warning": "69420"}
+        params = {"org_id": org_id_str}
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, params=params, headers=headers)
+                if response.status_code == 200:
+                    payload = self._normalize_department_payload(response.json(), org_id)
+                    if payload["departments"]:
+                        self._departments_cache[org_id_str] = (now, payload)
+                        return payload
+        except Exception as exc:
+            logger.warning("Failed querying departments at %s: %s", url, exc)
+
+        return {"org_id": org_id, "departments": []}
+
+    def _normalize_department_payload(self, data: Any, fallback_org_id: int | str) -> dict[str, Any]:
+        """Normalize the backend response to ``org_id`` plus department names."""
+        response_org_id: Any = fallback_org_id
+        raw_values: Any = data
+        if isinstance(data, dict):
+            response_org_id = data.get("org_id", fallback_org_id)
+            for key in ("departments", "specializations", "data", "results"):
+                if key in data:
+                    raw_values = data[key]
+                    break
+        if isinstance(raw_values, dict):
+            raw_values = raw_values.get("departments") or raw_values.get("specializations") or []
+        if not isinstance(raw_values, list):
+            return {"org_id": response_org_id, "departments": []}
+
+        departments: set[str] = set()
+        for value in raw_values:
+            if isinstance(value, str) and value.strip():
+                departments.add(value.strip())
+            elif isinstance(value, dict):
+                name = value.get("name") or value.get("department") or value.get("specialization")
+                if isinstance(name, str) and name.strip():
+                    departments.add(name.strip())
+        return {
+            "org_id": response_org_id,
+            "departments": sorted(departments, key=str.casefold),
+        }
 
     async def get_org_processes(
         self,
@@ -112,7 +179,7 @@ class MantraAssistBackendClient:
         """Fetch processes and stages with descriptions for an organization.
 
         Uses an in-memory TTL cache to avoid repeated network overhead.
-        Calls: GET /api/v1/processes?org_id={org_id} (with fallback endpoints)
+        Calls: GET /v1/processes?org_id={org_id} (with fallback endpoints)
         """
         import time
 
@@ -127,9 +194,10 @@ class MantraAssistBackendClient:
                 return cached_data
 
         urls = [
-            f"{self.base_url}/api/v1/webhooks/mcp/processes",
-            f"{self.base_url}/api/v1/processes",
-            f"{self.base_url}/api/v1/webhooks/mcp",
+            f"{self.base_url}/v1/webhooks/mcp/processes",
+            f"{self.base_url}/v1/processes",
+            f"{self.base_url}/v1/webhooks/mcp",
+            f"{self.base_url}/v1/webhooks/mcp/departments",
         ]
 
         headers: dict[str, str] = {

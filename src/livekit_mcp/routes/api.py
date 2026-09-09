@@ -200,10 +200,10 @@ def get_api_routes(server: FastMCP, app_settings: Settings, startup_time: dateti
     return [
         Route("/health", endpoint=health_endpoint, methods=["GET"]),
         Route("/", endpoint=root_endpoint, methods=["GET"]),
-        Route("/api/tools/call", endpoint=call_tool_endpoint, methods=["POST"]),
-        Route("/api/dev/token", endpoint=dev_token_endpoint, methods=["POST"]),
-        Route("/api/dev/recent-events", endpoint=recent_events_endpoint, methods=["GET"]),
-        Route("/api/dev/check-db", endpoint=check_db_endpoint, methods=["GET"]),
-        Route("/api/dev/check-lkt", endpoint=check_lkt_endpoint, methods=["GET"]),
+        Route("/tools/call", endpoint=call_tool_endpoint, methods=["POST"]),
+        Route("/dev/token", endpoint=dev_token_endpoint, methods=["POST"]),
+        Route("/dev/recent-events", endpoint=recent_events_endpoint, methods=["GET"]),
+        Route("/dev/check-db", endpoint=check_db_endpoint, methods=["GET"]),
+        Route("/dev/check-lkt", endpoint=check_lkt_endpoint, methods=["GET"]),
     ]
 

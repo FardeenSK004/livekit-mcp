@@ -21,4 +21,5 @@
 - [x] **Integration Contract (`structure.json` & `format.json`) (2026-08-22):** Created minimal 1:1 schema contracts for backend developer.
 - [x] **Automated Test Suite (2026-08-22):** 27 unit & integration tests passing 100% across auth, config, greeting, provider search, doctor availability receiver, and international timezone conversions.
 - [x] **Developer Landing Dashboard & Diagnostics UI (2026-08-25):** Created a clean, simplified developer landing console at `/` with PostgreSQL/LKT diagnostics and dynamic tool catalog schemas.
+- [x] **Department Clarification Tool (2026-09-09):** Added `get_org_departments` with 10-minute in-memory caching, registered it in the MCP server, and normalized the MantraAssist payload as `{org_id, departments}` for broad-symptom clarification.
 
