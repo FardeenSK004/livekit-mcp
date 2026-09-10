@@ -3,19 +3,28 @@
 > **Sprint:** 0.3.0 Production Dockerization & Org Processes Integration  
 > **Last Updated:** 2026-09-10  
 > **Status:** Active
-> **HEAD:** `993b674` (Client recognition added, 2026-09-07)
+> **HEAD:** `0de282c` (Merge tool/department into feature/mcp-client, 2026-09-09)
 
-## Repo-State Sync (2026-09-08, no code changes)
-- [x] **Vault resync:** Added `Features/Client Recognition Tool.md` + `Features/Org Processes Tool.md`; refreshed `Home.md`, `Architecture/*`, `Context/Repository Map.md`, `Context/Stack.md`, `Knowledge/Conventions.md` to match the working tree.
+## Repo-State Sync (2026-09-10, no code changes)
+- [x] **Vault resync:** Added `Features/Department Discovery Tool.md`; rewrote `Features/Doctor Availability Receiver Tool.md` to the live signature (pre-supplied slots OR backend query + DB fallback); corrected `Features/Client Recognition Tool.md` (metadata + `phone_number` param); fixed `Features/Org Processes Tool.md` fallback chain to `/v1/...`; fixed `Architecture/APIs.md` + `Security & Auth.md` route prefixes (`/tools/call`, `/dev/*`); refreshed `Home.md`, `Architecture/Overview.md`, `Context/Repository Map.md`, `Knowledge/Conventions.md` to HEAD `0de282c`.
 - [ ] **Gap: `docker-compose.yml` missing** — sprint/Changelog 0.3.2 reference it, but it is not tracked in git nor on disk. Re-add or correct history.
 - [ ] **Gap: `tests/` suite missing** — earlier docs claim 27 passing tests; no `tests/` dir exists (only `.pytest_cache`). Re-scaffold suite.
-- [ ] **Gap: `tools/__init__.py` export** — `register_client_recognition_tool` is wired in `server.py` but not re-exported. Add to `__all__`.
+- [ ] **Gap: `tools/__init__.py` exports** — `register_client_recognition_tool` + `register_department_tool` are wired in `server.py` but not re-exported. Add to `__all__`.
 - [ ] **Gap: version drift** — `pyproject.toml` is `0.1.0`, Changelog tracks `0.3.3`. Bump to `0.3.3`.
-- [ ] **Stale: `Greeting Tool.md`** — describes `greet_user`, but no `greeting.py` module exists in `tools/`. Confirm removal or restore.
+- [ ] **Stale: `Greeting Tool.md`** — describes `greet_user`, but no `greeting.py` module exists in `tools/` (no references in `src/`). Confirm removal or restore.
+- [ ] **Stale: `README.md`** — documents `/sse?token=...`, `/api/tools/call`, repo layout without `department_list.py`/`client_recognition.py`, and 3 tools. Refresh to `/tools/call`, 6 tool names, current layout.
+
+## Completed (2026-09-09, post-`993b674`)
+
+- [x] **Department Discovery Tool (2026-09-09):** Added `get_org_departments` (`tools/department_list.py` + `MantraAssistBackendClient.get_org_departments()` → `GET /v1/webhooks/mcp/departments`) with 10-min TTL cache and tolerant payload normalization. Registered in `server.py`. Commits `a11f3f4` + merge `0de282c`.
+- [x] **Client Recognition Metadata (2026-09-09):** `recognize_client` now returns `client_metadata.{ai_summaries, custom_fields}` unwrapping `data`/`result` envelopes with `name`/`full_name` fallbacks. Commit `7d88c33`.
+- [x] **Route Prefix Simplification (2026-09-09):** `routes/api.py` mounts `/tools/call` + `/dev/*` (was `/api/tools/call`, `/api/dev/*`). Part of `a11f3f4`.
+- [x] **LKT Active-Calls Path Fix (2026-09-09):** `lkt_client.get_active_calls()` now hits `/v1/dashboard/active-calls` (was `/api/v1/...`). Part of `a11f3f4`.
+- [x] **Doctor Availability Endpoint Rename (2026-09-09):** description now references `/v1/providers/availability` (was `/api/v1/...`). Part of `a11f3f4`.
 
 ## Completed
 
-- [x] **Inbound Client Recognition MCP Tool (2026-09-07):** Added `recognize_client` to normalize the inbound caller number and query the MA backend with `org_id` plus phone number. The livekit agent calls this tool before greeting and treats `null`, timeout, or backend failure as an anonymous caller. Backend endpoint contract: `GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}`.
+- [x] **Inbound Client Recognition MCP Tool (2026-09-07):** Added `recognize_client` to normalize the inbound caller number and query the MA backend with `org_id` plus phone number. The livekit agent calls this tool before greeting and treats `null`, timeout, or backend failure as an anonymous caller. Backend endpoint contract (current): `GET /v1/webhooks/mcp/lead?org_id={org_id}&phone_number={phone}`.
 
 - [x] **Production Docker Build & Exec Fix (2026-09-01):** Resolved `exec /app/.venv/bin/livekit-mcp: no such file or directory` by enforcing `UV_PYTHON=/usr/local/bin/python3.12` in `Dockerfile`. Added `docker-compose.yml` with `env_file: .env` and fixed `DATABASE_URL` format.
 - [x] **Production Environment Config (2026-08-30):** Created dedicated production environment file `.env.prod` with `ENVIRONMENT=production`, secure JWT secret configuration, and production service URLs. Files: `.env.prod`.

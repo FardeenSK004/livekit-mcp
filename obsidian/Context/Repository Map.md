@@ -1,6 +1,6 @@
 # Repository Map
 
-> **Last verified:** 2026-09-08 (against `git ls-files` + working tree)
+> **Last verified:** 2026-09-10 (against `git ls-files` + working tree, HEAD `0de282c`)
 
 ```text
 livekit-mcp/
@@ -32,18 +32,19 @@ livekit-mcp/
 │       ├── clients/
 │       │   ├── __init__.py
 │       │   ├── auth_client.py      # Mantra Auth RFC 7662 introspection
-│       │   ├── backend_client.py   # MantraAssist-backend (availability, processes, recognition)
+│       │   ├── backend_client.py   # MantraAssist-backend (availability GET+POST /v1/webhooks/mcp, departments, processes, recognition)
 │       │   ├── db_client.py        # asyncpg pool for assist_db
-│       │   └── lkt_client.py       # Async client for LKT FastAPI service
+│       │   └── lkt_client.py       # Async client for LKT FastAPI service (active-calls: /v1/dashboard/active-calls)
 │       ├── routes/
 │       │   ├── __init__.py
-│       │   └── api.py          # /health, / root JSON, /api/tools/call, /api/dev/*
+│       │   └── api.py          # /health, / root JSON, /tools/call, /dev/* (check-db, check-lkt, token, recent-events)
 │       ├── tools/
-│       │   ├── __init__.py             # Exports provider/doctor/processes registrars (client_recognition NOT re-exported)
+│       │   ├── __init__.py             # Exports provider/doctor/processes registrars (client_recognition + department_list NOT re-exported)
 │       │   ├── providers.py            # search_provider_availability
-│       │   ├── doctor_availability.py  # receive_doctor_availability
+│       │   ├── doctor_availability.py  # receive_doctor_availability (pre-supplied slots OR backend query + DB fallback)
 │       │   ├── org_processes.py        # fetch_org_processes + alias receive_org_processes
-│       │   └── client_recognition.py   # recognize_client
+│       │   ├── department_list.py      # get_org_departments (NEW 2026-09-09)
+│       │   └── client_recognition.py   # recognize_client (now returns client_metadata: ai_summaries + custom_fields)
 │       └── utils/
 │           ├── db_logger.py    # MCP event telemetry (save_mcp_event, get_recent_events)
 │           └── timezone.py     # phonenumbers caller-tz detection + UTC conversion
@@ -67,13 +68,16 @@ livekit-mcp/
     │   ├── Provider Availability Tool.md
     │   ├── Doctor Availability Receiver Tool.md
     │   ├── Org Processes Tool.md
+    │   ├── Department Discovery Tool.md
     │   └── Client Recognition Tool.md
     └── Knowledge/
         ├── Coding Standards.md
         └── Conventions.md
 ```
 
-## Known Drift (2026-09-08)
+## Known Drift (2026-09-10)
 - `docker-compose.yml` (sprint/Changelog 0.3.2) is **missing** from repo — needs re-adding or history correction.
 - `tests/` suite no longer exists — only `.pytest_cache` remains.
 - No `greeting.py` — `Greeting Tool.md` describes a tool with no current source module.
+- `tools/__init__.py` exports only provider/doctor/processes registrars — `client_recognition` + `department_list` registered in `server.py` but not re-exported.
+- Route prefix change (2026-09-09): `routes/api.py` now mounts `/tools/call` and `/dev/*` (was `/api/tools/call`, `/api/dev/*`) — README still documents the old paths.

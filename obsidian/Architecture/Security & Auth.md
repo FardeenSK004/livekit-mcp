@@ -26,7 +26,7 @@ The LiveKit MCP Server integrates with **Mantra Auth** (`~/mantra-auth`), an OAu
 ## Error Handling
 - Missing token: `401 Unauthorized` with `{"error": "unauthorized", "error_description": "Authorization token required"}` (dev/non-production allows anonymous `anonymous-dev` state instead)
 - Invalid/Expired token: `401 Unauthorized` with `{"error": "invalid_token", "error_description": "Token is invalid or expired"}`
-- Unprotected routes: `/health`, `/`, `/docs`, `/openapi.json`, `/favicon.ico`, `/robots.txt`, `/sitemap.xml`, `/api/dev/token`, `/api/dev/check-db`, `/api/dev/check-lkt` bypass authentication.
+- Unprotected routes: `/health`, `/`, `/docs`, `/openapi.json`, `/favicon.ico`, `/robots.txt`, `/sitemap.xml`, `/dev/token`, `/dev/check-db`, `/dev/check-lkt` bypass authentication.
 
 ## Verification Order (`AuthMiddleware`)
 1. Local HS256 JWT verify (`jwt_secret`, optional `JWT_ISSUER`/`MCP_ISSUER_URL` issuer, `JWT_AUDIENCE` audience).
