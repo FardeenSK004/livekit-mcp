@@ -19,6 +19,48 @@ class MantraAssistBackendClient:
         self.settings = settings or get_settings()
         self.base_url = self.settings.mantraassist_backend_url.rstrip("/")
 
+    async def recognize_client(
+        self,
+        org_id: int | str,
+        phone_number: str,
+        timeout: float = 5.0,
+    ) -> dict[str, Any] | None:
+        """Fetch an inbound caller lead through the MA MCP webhook endpoint.
+
+        Contract: GET /v1/webhooks/mcp/lead?org_id={org_id}&phone={phone_number}.
+        """
+        url = f"{self.base_url}/v1/webhooks/mcp/lead"
+        params = {
+            "org_id": str(org_id),
+            "phone_number": str(phone_number).strip(),
+        }
+        headers = {"ngrok-skip-browser-warning": "69420"}
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                logger.info("[MA-BACKEND] Recognizing client: GET %s | Params: %s", url, params)
+                response = await client.get(url, params=params, headers=headers)
+                logger.info(
+                    "[MA-BACKEND] Client recognition response HTTP %d: %s",
+                    response.status_code,
+                    response.text[:1000],
+                )
+                if response.status_code != 200:
+                    logger.warning(
+                        "Client recognition backend returned HTTP %d: %s",
+                        response.status_code,
+                        response.text[:200],
+                    )
+                    return None
+
+                data = response.json()
+                if not isinstance(data, dict):
+                    return {"data": data}
+                return data
+        except Exception as error:
+            logger.warning("Client recognition backend request failed: %s", error)
+            return None
+
     async def get_doctor_availability(
         self,
         org_id: int | str | None = None,
@@ -103,6 +145,73 @@ class MantraAssistBackendClient:
 
     # In-memory temporary cache: org_id -> (timestamp, data)
     _processes_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+    _departments_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+    async def get_org_departments(
+        self,
+        org_id: int | str,
+        timeout: float = 5.0,
+        ttl_seconds: float = 600.0,
+    ) -> dict[str, Any]:
+        """Fetch the backend department payload for an organization.
+
+        Expected backend response shape::
+
+            {"org_id": 77, "departments": ["retina", "cataract", "lasik"]}
+
+        Calls: GET /v1/webhooks/mcp/departments?org_id={org_id}
+        """
+        org_id_str = str(org_id).strip()
+        now = time.time()
+
+        cached = self._departments_cache.get(org_id_str)
+        if cached and now - cached[0] < ttl_seconds:
+            return cached[1]
+
+        url = f"{self.base_url}/v1/webhooks/mcp/departments"
+        headers = {"ngrok-skip-browser-warning": "69420"}
+        params = {"org_id": org_id_str}
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, params=params, headers=headers)
+                if response.status_code == 200:
+                    payload = self._normalize_department_payload(response.json(), org_id)
+                    if payload["departments"]:
+                        self._departments_cache[org_id_str] = (now, payload)
+                        return payload
+        except Exception as exc:
+            logger.warning("Failed querying departments at %s: %s", url, exc)
+
+        return {"org_id": org_id, "departments": []}
+
+    def _normalize_department_payload(self, data: Any, fallback_org_id: int | str) -> dict[str, Any]:
+        """Normalize the backend response to ``org_id`` plus department names."""
+        response_org_id: Any = fallback_org_id
+        raw_values: Any = data
+        if isinstance(data, dict):
+            response_org_id = data.get("org_id", fallback_org_id)
+            for key in ("departments", "specializations", "data", "results"):
+                if key in data:
+                    raw_values = data[key]
+                    break
+        if isinstance(raw_values, dict):
+            raw_values = raw_values.get("departments") or raw_values.get("specializations") or []
+        if not isinstance(raw_values, list):
+            return {"org_id": response_org_id, "departments": []}
+
+        departments: set[str] = set()
+        for value in raw_values:
+            if isinstance(value, str) and value.strip():
+                departments.add(value.strip())
+            elif isinstance(value, dict):
+                name = value.get("name") or value.get("department") or value.get("specialization")
+                if isinstance(name, str) and name.strip():
+                    departments.add(name.strip())
+        return {
+            "org_id": response_org_id,
+            "departments": sorted(departments, key=str.casefold),
+        }
 
     async def get_org_processes(
         self,

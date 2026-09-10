@@ -2,6 +2,56 @@
 
 All notable changes to the `livekit-mcp` project are documented in this file.
 
+## [Unreleased] — vault sync 2026-09-10
+
+### Added
+
+- **Department Discovery docs:** New `Features/Department Discovery Tool.md` for `get_org_departments` (`GET /v1/webhooks/mcp/departments`, TTL cache, tolerant normalization).
+
+### Fixed (docs only, no code changes)
+
+- Rewrote `Features/Doctor Availability Receiver Tool.md` to the live signature (pre-supplied slots OR `GET+POST /v1/webhooks/mcp` query + `assist_db` fallback, UTC-slot localization).
+- Corrected `Features/Client Recognition Tool.md` (metadata `ai_summaries`/`custom_fields`, `phone_number` param, `/v1/webhooks/mcp/lead` contract).
+- Fixed `Features/Org Processes Tool.md` fallback chain to `/v1/...` paths.
+- Fixed `Architecture/APIs.md` + `Architecture/Security & Auth.md` route prefixes (`/tools/call`, `/dev/*`).
+- Refreshed `Home.md` (6 tool names), `Architecture/Overview.md` (topology + backend endpoints), `Context/Repository Map.md` (HEAD `0de282c`), `Knowledge/Conventions.md` (contracts, caches, exports).
+- Recorded remaining drift: missing `docker-compose.yml`, missing `tests/` suite, `tools/__init__.py` export gap (`client_recognition` + `department_list`), `pyproject.toml` version drift (`0.1.0` vs `0.3.3`), stale `Greeting Tool.md`, stale `README.md` route/tool docs.
+
+## [Unreleased] — department branch 2026-09-09 (`a11f3f4` → `7d88c33` → merge `0de282c`)
+
+### Added
+
+- **Organization Department Discovery (`get_org_departments`)**: Cached MCP tool fetching departments/specialties from `GET /v1/webhooks/mcp/departments?org_id={org_id}` for broad-symptom clarification; normalizes `departments`/`specializations`/`data`/`results` shapes into sorted `{"org_id", "departments"}`.
+- **Client Recognition Metadata**: `recognize_client` now returns `client_metadata` with `ai_summaries` and `custom_fields`, unwrapping `data`/`result` envelopes with `name`/`full_name` fallbacks.
+
+### Changed
+
+- **Route Prefix Simplification**: `routes/api.py` now mounts `/tools/call` and `/dev/*` (previously `/api/tools/call`, `/api/dev/*`).
+- **LKT Active-Calls Path**: `get_active_calls()` now uses `/v1/dashboard/active-calls` (previously `/api/v1/...`).
+- **Doctor Availability Endpoint Reference**: Tool description now references `/v1/providers/availability`.
+
+### Fixed
+
+- **Merge Registration Import:** Corrected `server.py` to import `register_client_recognition_tool` from its dedicated `client_recognition` module after merging the department tool branch.
+
+### Client Recognition Response Mapping
+
+- **fix:** The MCP tool maps lead responses such as `{"name":"SK"}` to `{"client_name":"SK"}`, preserves null results, and returns `client_metadata` (`ai_summaries`, `custom_fields`).
+- **fix:** The lead lookup uses the `phone_number` query parameter (`GET /v1/webhooks/mcp/lead?org_id={org_id}&phone_number={phone}`, 5s timeout).
+
+### Fixed (docs only, no code changes)
+
+- Added missing `Features/Client Recognition Tool.md` and `Features/Org Processes Tool.md`.
+- Refreshed `Home.md`, `Architecture/Overview.md`, `Architecture/APIs.md`, `Architecture/Security & Auth.md`, `Context/Repository Map.md`, `Context/Stack.md`, `Knowledge/Conventions.md` to match the working tree at `993b674`.
+- Recorded known drift: missing `docker-compose.yml`, missing `tests/` suite, `tools/__init__.py` export gap, `pyproject.toml` version drift (`0.1.0` vs `0.3.3`), stale `Greeting Tool.md`.
+
+## [0.3.3] - 2026-09-07
+
+### Added
+
+- **Inbound Client Recognition Tool (`recognize_client`)**: Added an MCP tool that normalizes an inbound phone number, sends `org_id` and the E.164-style number to `GET /v1/webhooks/mcp/lead`, and returns lead data or `null` for anonymous callers.
+- **Bounded Backend Lookup**: Client recognition uses a five-second backend timeout and fails open so inbound calls are not blocked when the backend is unavailable.
+
 ## [0.3.2] - 2026-09-01
 
 ### Fixed

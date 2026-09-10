@@ -16,6 +16,8 @@ from starlette.routing import Mount, Route
 
 from livekit_mcp.auth.middleware import AuthMiddleware
 from livekit_mcp.config import Settings, get_settings
+from livekit_mcp.tools.client_recognition import register_client_recognition_tool
+from livekit_mcp.tools.department_list import register_department_tool
 from livekit_mcp.tools.doctor_availability import register_doctor_availability_tool
 from livekit_mcp.tools.org_processes import register_org_processes_tool
 from livekit_mcp.tools.providers import register_provider_tools
@@ -53,8 +55,10 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
 
     # Register tools
     register_org_processes_tool(server, settings=app_settings)
+    register_department_tool(server, settings=app_settings)
     register_provider_tools(server, settings=app_settings)
     register_doctor_availability_tool(server, settings=app_settings)
+    register_client_recognition_tool(server, settings=app_settings)
 
     return server
 

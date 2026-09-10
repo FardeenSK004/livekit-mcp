@@ -5,7 +5,7 @@
 > **Repository:** `livekit-mcp`  
 > **Language & Runtime:** Python 3.11+ / uv  
 > **Protocol:** Model Context Protocol (MCP 2.0)  
-> **Last Updated:** 2026-08-20
+> **Last Updated:** 2026-09-10
 
 ---
 
@@ -14,7 +14,7 @@
 | Area | Document |
 | :--- | :--- |
 | 🏛️ Architecture | [[Architecture/Overview.md\|Overview]] · [[Architecture/Data Flow.md\|Data Flow]] · [[Architecture/Security & Auth.md\|Security & Auth]] · [[Architecture/APIs.md\|APIs]] |
-| 🎯 Features | [[Features/Greeting Tool.md\|Greeting Tool]] |
+| 🎯 Features | [[Features/Greeting Tool.md\|Greeting Tool]] · [[Features/Provider Availability Tool.md\|Provider Availability]] · [[Features/Doctor Availability Receiver Tool.md\|Doctor Availability Receiver]] · [[Features/Org Processes Tool.md\|Org Processes]] · [[Features/Department Discovery Tool.md\|Department Discovery]] · [[Features/Client Recognition Tool.md\|Client Recognition]] |
 | 📋 Development | [[Development/Current Sprint.md\|Current Sprint]] · [[Development/TODO.md\|TODO]] · [[Development/Changelog.md\|Changelog]] |
 | 🧠 Knowledge | [[Knowledge/Coding Standards.md\|Coding Standards]] · [[Knowledge/Conventions.md\|Conventions]] |
 | 📖 Context | [[Context/Project Summary.md\|Project Summary]] · [[Context/Stack.md\|Stack]] · [[Context/Repository Map.md\|Repository Map]] |
@@ -45,6 +45,11 @@ AI Client (Cursor / Claude / Web)
 ## Repository Status
 
 - **Transport:** SSE & Streamable HTTP (`/sse`, `/messages`), with Starlette integration
-- **Auth:** OAuth 2.1 / HS256 Shared JWT Verification against `mantra-auth`
-- **Testing:** Comprehensive automated pytest test suite (`tests/`)
+- **Auth:** OAuth 2.1 / HS256 Shared JWT Verification against `mantra-auth` (local verify first, RFC 7662 introspection fallback)
+- **Registered Tools (6 names / 5 modules):** `search_provider_availability`, `receive_doctor_availability`, `fetch_org_processes` (+ alias `receive_org_processes`), `get_org_departments`, `recognize_client`
+- **Backends:** `MantraAssistBackendClient` (`MANTRAASSIST_BACKEND_URL`, default `:5500`) for availability (`GET+POST /v1/webhooks/mcp`), departments (`/v1/webhooks/mcp/departments`), org processes (fallback chain), and client recognition (`/v1/webhooks/mcp/lead`); `LktClient` for voice engine (`:8081`); `AuthClient` for token introspection
+- **HTTP surface:** `/health`, `/` (public); `/tools/call`, `/dev/*` (auth-gated app routes; diagnostics bypass per middleware public paths)
 - **Package Manager:** `uv`
+- **Deploy:** Production multi-stage `Dockerfile` (Python 3.12, `appuser` UID 10001, `/health` healthcheck). Note: `docker-compose.yml` referenced in sprint history is not present in the repo as of 2026-09-10.
+- **Testing:** `tests/` suite referenced in earlier docs no longer exists in the repo as of 2026-09-10 (only `.pytest_cache` remains) — suite needs re-scaffolding.
+- **Version drift:** `pyproject.toml` still `0.1.0` while Changelog tracks `0.3.3` — version bump pending.

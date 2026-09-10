@@ -24,6 +24,20 @@
 - **Auth:** Bearer token in header or `?token=<jwt>`
 - **Description:** JSON-RPC 2.0 endpoint for MCP commands (tool listing, tool execution, prompts, resources).
 
+### 4. `GET /` (Root Status)
+- **Auth:** None (Public)
+- **Description:** Lightweight JSON status response (`{"status": "working", "service": "livekit-mcp", ...}`).
+
+### 5. `POST /tools/call`
+- **Auth:** Bearer token required
+- **Description:** Direct synchronous tool invocation for internal microservices (e.g. `lkt`). Body: `{"name": "<tool>", "arguments": {...}}`. Handles both FastMCP `CallToolResult` and raw list responses; logs start/complete/fail telemetry via `db_logger`.
+
+### 6. Dev & Diagnostics (public, token generator disabled in production)
+- `POST /dev/token` — signs local HS256 test JWTs (`user`, `client`, `scope`, `hours`); returns `403` in production.
+- `GET /dev/check-db` — verifies PostgreSQL connectivity (`SELECT 1`).
+- `GET /dev/check-lkt` — pings the LKT voice engine base URL.
+- `GET /dev/recent-events` — returns last 30 telemetry events from `db_logger`.
+
 ---
 
 ## Registered MCP Tools
@@ -42,14 +56,30 @@
   - `query` (string, optional): Optional doctor name or specialization filter (e.g. `Sharma`, `Diabetes`, `Cardiology`).
 
 ### `receive_doctor_availability`
-- **Description:** Receives calculated doctor working hours, open slots, and booked slots pushed from MantraAssist backend and formats them into voice context for LiveKit Voice Agent calls.
+- **Description:** Resolves doctor working hours and open slots for an organization and formats them into voice-agent-ready local-time strings. Accepts pre-supplied `providers` / `name`+`available_slots`, otherwise queries `MantraAssist-backend` (`GET /v1/webhooks/mcp`, `POST` fallback) with a direct `assist_db` fallback. Timezone: explicit `timezone` → phone detection → `Asia/Kolkata`; UTC slots localized via `convert_utc_slot_to_local`.
 - **Arguments:**
-  - `doctor_id` (integer, required): Doctor ID from `users` table.
-  - `doctor_name` (string, required): Full name of the doctor with title.
-  - `date` (string, required): Date in `YYYY-MM-DD`.
-  - `timezone` (string, required): Timezone string (e.g. `Asia/Kolkata`).
-  - `available_slots` (array of strings, required): List of open slots in local time.
-  - `specialization` (string, optional): Medical specialty.
-  - `booked_slots` (array of strings, optional): Already booked slots.
-  - `slot_interval_minutes` (integer, optional, default: 60): Duration in minutes.
-  - `notes` (string, optional): Special clinical notes.
+  - `org_id` (integer|string, optional): Organization ID.
+  - `name` (string, optional): Doctor name filter.
+  - `date` (string, optional): Target date (`YYYY-MM-DD`, `today`, `tomorrow`, ...).
+  - `department` (string, optional): Department / specialization filter.
+  - `providers` (array of objects, optional): Pre-supplied providers (`user_id`, `name`, `available_slots` UTC ranges).
+  - `available_slots` (array of strings, optional): Pre-supplied UTC slots for `name` (+ `user_id`).
+  - `caller_phone` (string, optional): Caller number for timezone auto-detection.
+  - `timezone` (string, optional): Explicit timezone override.
+- **Backend contract:** fixed UTC schema `{org_id, date, datetime, doc_name, department, caller_phone}`.
+
+### `fetch_org_processes` (+ alias `receive_org_processes`)
+- **Description:** Queries `MantraAssist-backend` for all processes and stage IDs with descriptions for an organization; used during post-call analysis to assign `process_id` / `new_stage_id`. 10-minute in-memory TTL cache per `org_id`, with fallback endpoint chain.
+- **Arguments:**
+  - `org_id` (integer|string, required): Organization ID (e.g. `77`).
+
+### `recognize_client`
+- **Description:** Identifies an inbound caller by organization and phone number before greeting. Normalizes the number to E.164 style (bare 10-digit numbers assumed `+91`), calls `GET /v1/webhooks/mcp/lead?org_id={org_id}&phone_number={phone}` with a 5s timeout, and fails open (`{"client_name": null, "client_metadata": {"ai_summaries": [], "custom_fields": []}}`) on timeout/non-200/backend failure.
+- **Arguments:**
+  - `org_id` (integer|string, required): Organization ID for the inbound number.
+  - `phone_number` (string, required): Inbound caller number, preferably E.164.
+
+### `get_org_departments`
+- **Description:** Fetches the medical departments/specialties supported by an organization from `MantraAssist-backend` (`GET /v1/webhooks/mcp/departments?org_id={org_id}`); used for one clarifying question on broad symptoms before doctor-availability lookup. 10-minute in-memory TTL cache per `org_id`; returns `{"org_id": <id>, "departments": [<names>]}` (empty list on failure).
+- **Arguments:**
+  - `org_id` (integer|string, required): Organization ID for the current call.
