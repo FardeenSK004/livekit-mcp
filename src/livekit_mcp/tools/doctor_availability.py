@@ -29,7 +29,7 @@ def register_doctor_availability_tool(
         name="receive_doctor_availability",
         description=(
             "Check and retrieve doctor availability, working hours, and open consultation slots for an organization. "
-            "Queries the MantraAssist-backend HTTP API endpoint (/api/v1/providers/availability) with optional doctor name "
+            "Queries the MantraAssist-backend HTTP API endpoint (/v1/providers/availability) with optional doctor name "
             "and medical department/specialization, auto-detects the caller's timezone from their phone number, and converts UTC slots to local time."
         ),
     )

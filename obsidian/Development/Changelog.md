@@ -4,6 +4,10 @@ All notable changes to the `livekit-mcp` project are documented in this file.
 
 ## [Unreleased] — vault sync 2026-09-08
 
+### Fixed
+
+- **Merge Registration Import:** Corrected `server.py` to import `register_client_recognition_tool` from its dedicated `client_recognition` module after merging the department tool branch.
+
 ### Client Recognition Response Mapping
 
 - **fix:** The MCP tool maps lead responses such as `{"name":"SK"}` to `{"client_name":"SK"}` and preserves null results.
@@ -21,6 +25,13 @@ All notable changes to the `livekit-mcp` project are documented in this file.
 
 - **Inbound Client Recognition Tool (`recognize_client`)**: Added an MCP tool that normalizes an inbound phone number, sends `org_id` and the E.164-style number to `GET /webhooks/mcp/lead?org_id={org_id}&phone={phone}`, and returns lead data or `null` for anonymous callers.
 - **Bounded Backend Lookup**: Client recognition uses a three-second backend timeout and fails open so inbound calls are not blocked when the backend is unavailable.
+
+## [Unreleased]
+
+### Added
+
+- **Organization Department Discovery (`get_org_departments`)**: Added a cached MCP tool that fetches organization-specific medical departments/specialties from MantraAssist-backend for broad-symptom clarification before doctor availability lookup.
+- **Department Payload Contract**: Normalized the MantraAssist response as `{"org_id": <id>, "departments": [<names>]}` and preserved `org_id` through the MCP tool and cache.
 
 ## [0.3.2] - 2026-09-01
 

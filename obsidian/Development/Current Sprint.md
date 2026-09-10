@@ -1,7 +1,7 @@
 # Current Sprint
 
 > **Sprint:** 0.3.0 Production Dockerization & Org Processes Integration  
-> **Last Updated:** 2026-09-08  
+> **Last Updated:** 2026-09-10  
 > **Status:** Active
 > **HEAD:** `993b674` (Client recognition added, 2026-09-07)
 
@@ -34,4 +34,6 @@
 - [x] **Integration Contract (`structure.json` & `format.json`) (2026-08-22):** Created minimal 1:1 schema contracts for backend developer.
 - [x] **Automated Test Suite (2026-08-22):** 27 unit & integration tests passing 100% across auth, config, greeting, provider search, doctor availability receiver, and international timezone conversions.
 - [x] **Developer Landing Dashboard & Diagnostics UI (2026-08-25):** Created a clean, simplified developer landing console at `/` with PostgreSQL/LKT diagnostics and dynamic tool catalog schemas.
+- [x] **Department Clarification Tool (2026-09-09):** Added `get_org_departments` with 10-minute in-memory caching, registered it in the MCP server, and normalized the MantraAssist payload as `{org_id, departments}` for broad-symptom clarification.
+- [x] **Merge Import Repair (2026-09-10):** Corrected the client recognition registration import to use `tools.client_recognition` after merging the department tool branch.
 
