@@ -1,10 +1,8 @@
 import json
 import logging
-import time
 from typing import Any
 
 import httpx
-from pydantic import v1
 
 from livekit_mcp.config import Settings, get_settings
 from livekit_mcp.utils.timezone import resolve_date_string, to_utc_iso_string
@@ -27,10 +25,10 @@ class MantraAssistBackendClient:
     ) -> dict[str, Any] | None:
         """Resolve an inbound caller name through the MA client recognition endpoint.
 
-        Contract: POST /api/v1/webhooks/client-recognition with org_id and phone_number.
-        Expected response: {"client_name": "..."} or {"client_name": null}.
+        Contract: POST /v1/webhooks/client-recognition with org_id and phone_number.
+        Expected response: {"client_name": "...", "user_id": } or null fields.
         """
-        url = f"{self.base_url}/api/v1/webhooks/client-recognition"
+        url = f"{self.base_url}/v1/webhooks/client-recognition"
         payload = {
             "org_id": str(org_id),
             "phone_number": str(phone_number).strip(),
@@ -53,7 +51,10 @@ class MantraAssistBackendClient:
                     return None
                 if isinstance(data.get("data"), dict):
                     data = data["data"]
-                return {"client_name": data.get("client_name")}
+                return {
+                    "client_name": data.get("client_name"),
+                    "user_id": data.get("user_id"),
+                }
         except Exception as error:
             logger.warning("Client recognition backend request failed: %s", error)
             return None
@@ -139,6 +140,57 @@ class MantraAssistBackendClient:
             logger.error("Failed to connect to MantraAssist backend at %s: %s", url, e)
 
         return None
+
+    async def manage_appointments(
+        self,
+        *,
+        action: str,
+        org_id: int | str,
+        user_id: int | str,
+        appointment_id: int | str | None = None,
+        appointment_title: str | None = None,
+        requested_date: str | None = None,
+        new_datetime: str | None = None,
+        timeout: float = 5.0,
+    ) -> Any:
+        """List, check, cancel, or reschedule a recognized client's appointments.
+
+        Provisional contract: POST /v1/webhooks/appointments.
+        The endpoint is intentionally isolated here so its path can be changed later.
+        """
+        url = f"{self.base_url}/v1/webhooks/appointments"
+        payload = {
+            "action": str(action).strip().lower(),
+            "org_id": str(org_id),
+            "user_id": str(user_id),
+        }
+        if appointment_id not in (None, ""):
+            payload["appointment_id"] = appointment_id
+        if appointment_title:
+            payload["appointment_title"] = appointment_title.strip()
+        if requested_date:
+            payload["requested_date"] = requested_date.strip()
+        if new_datetime:
+            payload["new_datetime"] = new_datetime.strip()
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={"ngrok-skip-browser-warning": "69420"},
+                )
+                if response.status_code != 200:
+                    logger.warning(
+                        "Appointment backend returned HTTP %d: %s",
+                        response.status_code,
+                        response.text[:300],
+                    )
+                    return {"status": "error", "message": response.text[:300]}
+                return response.json()
+        except Exception as error:
+            logger.warning("Appointment backend request failed: %s", error)
+            return {"status": "error", "message": str(error)}
 
     # In-memory temporary cache: org_id -> (timestamp, data)
     _processes_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}

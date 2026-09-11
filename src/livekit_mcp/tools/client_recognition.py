@@ -38,14 +38,14 @@ def register_client_recognition_tool(
         name="recognize_client",
         description=(
             "Identify an inbound caller by organization and phone number before the greeting. "
-            "Returns a client name when registered, otherwise null."
+            "Returns client_name and user_id when registered; both are null for an anonymous caller."
         ),
     )
     async def recognize_client(
         org_id: Annotated[int | str, "Organization ID associated with the inbound phone number"],
         phone_number: Annotated[str, "Inbound caller phone number, preferably in E.164 format"],
     ) -> str:
-        """Return the registered client name or a null name for anonymous callers."""
+        """Return the registered client identity or null fields for anonymous callers."""
         normalized_phone = normalize_phone_number(phone_number)
         logger.info(
             "[MCP-TOOL] recognize_client called for org_id=%s, phone=%s",
@@ -56,4 +56,9 @@ def register_client_recognition_tool(
             org_id=org_id,
             phone_number=normalized_phone,
         )
-        return json.dumps({"client_name": result.get("client_name") if result else None})
+        return json.dumps(
+            {
+                "client_name": result.get("client_name") if result else None,
+                "user_id": result.get("user_id") if result else None,
+            }
+        )

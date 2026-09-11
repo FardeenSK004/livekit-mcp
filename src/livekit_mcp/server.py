@@ -5,17 +5,18 @@ import logging
 import os
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, Response
+from starlette.responses import Response
 from starlette.routing import Mount, Route
 
 from livekit_mcp.auth.middleware import AuthMiddleware
 from livekit_mcp.config import Settings, get_settings
+from livekit_mcp.routes.api import get_api_routes
+from livekit_mcp.tools.appointments import register_appointment_tool
 from livekit_mcp.tools.client_recognition import register_client_recognition_tool
 from livekit_mcp.tools.doctor_availability import register_doctor_availability_tool
 from livekit_mcp.tools.org_processes import register_org_processes_tool
@@ -36,9 +37,6 @@ logger = logging.getLogger(__name__)
 # Track server startup time for dashboard uptime display
 STARTUP_TIME = datetime.now(UTC)
 
-
-from livekit_mcp.routes.api import get_api_routes
-
 def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     """Create and configure the underlying FastMCP server instance."""
     app_settings = settings or get_settings()
@@ -57,6 +55,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     register_provider_tools(server, settings=app_settings)
     register_doctor_availability_tool(server, settings=app_settings)
     register_client_recognition_tool(server, settings=app_settings)
+    register_appointment_tool(server, settings=app_settings)
 
     return server
 
